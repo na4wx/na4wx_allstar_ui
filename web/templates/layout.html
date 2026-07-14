@@ -6,13 +6,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{block "title" .}}HamVoIP Config{{end}} · HamVoIP Config</title>
+  <title>{{block "title" .}}NA4WX Allstar Dashboard{{end}} · NA4WX Allstar Dashboard</title>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   {{if .LoggedIn}}
   <header class="topbar">
-    <span class="brand">HamVoIP Config</span>
+    <span class="brand">NA4WX Allstar Dashboard</span>
     <nav>
       <a href="/">Dashboard</a>
       <a href="/nodes">Nodes</a>
@@ -30,6 +30,9 @@
     {{if .Flash}}<div class="flash {{.FlashKind}}">{{.Flash}}</div>{{end}}
     {{block "content" .}}{{end}}
   </main>
+  <footer class="app-footer">
+    Copyright &copy; 2026 Jordan Webb, NA4WX. Licensed under the <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU GPL v3</a>. Provided with no warranty; use at your own risk.
+  </footer>
   <script src="/static/js/app.js"></script>
 </body>
 </html>

@@ -209,3 +209,13 @@ table th { color: var(--text-dim); font-weight: 500; font-size: 0.85rem; }
   margin: -0.3rem 0 0.9rem;
   line-height: 1.5;
 }
+
+.app-footer {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+.app-footer a { color: var(--text-dim); }
