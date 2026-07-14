@@ -1,0 +1,16 @@
+[Unit]
+Description=HamVoIP Config GUI
+After=network.target asterisk.service
+Wants=asterisk.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk
+Restart=on-failure
+RestartSec=2
+# The GUI edits Asterisk config and calls asterisk -rx / systemctl, so it
+# needs root. Lock it down with capability bounding rather than sudo tricks.
+User=root
+
+[Install]
+WantedBy=multi-user.target

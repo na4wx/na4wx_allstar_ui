@@ -1,0 +1,48 @@
+{{define "title"}}Dashboard{{end}}
+{{define "content"}}
+<h1>Dashboard</h1>
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+    <h2 style="margin:0">Node status</h2>
+    <span class="status-pill" data-status-pill><span class="dot"></span><span class="label">Checking…</span></span>
+  </div>
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="label">Hostname</div>
+      <div class="value" data-hostname>{{.Status.Hostname}}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Uptime</div>
+      <div class="value" data-uptime>{{.Status.Uptime}}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Configured nodes</div>
+      <div class="value">{{len .Nodes}}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Nodes</h2>
+  {{if .Nodes}}
+  <table>
+    <thead><tr><th>Node</th><th>RX channel</th><th></th></tr></thead>
+    <tbody>
+      {{range .Nodes}}
+      <tr>
+        <td>{{.Number}}</td>
+        <td>{{.RXChannel}}</td>
+        <td><a class="btn" href="/nodes/{{.Number}}">Edit</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No nodes configured yet.</p>
+  {{end}}
+  <div class="actions">
+    <a class="btn primary" href="/nodes/new">Add node</a>
+  </div>
+</div>
+{{end}}
+{{template "layout" .}}

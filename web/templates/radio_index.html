@@ -1,0 +1,37 @@
+{{define "title"}}Radio Interface{{end}}
+{{define "content"}}
+<h1>Radio interface</h1>
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Driver type</h2>
+    {{template "help" "HamVoIP supports two different drivers for USB radio interface boards. Almost all setups use the first one — only switch if you know your specific hardware needs the other."}}
+  </div>
+  <div class="actions" style="margin-top:0.75rem">
+    <a class="btn {{if eq .File "usbradio.conf"}}primary{{end}}" href="/radio?file=usbradio.conf">Standard (usbradio.conf)</a>
+    <a class="btn {{if eq .File "simpleusb.conf"}}primary{{end}}" href="/radio?file=simpleusb.conf">Simple (simpleusb.conf)</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Devices</h2>
+  {{if .Devices}}
+  <table>
+    <thead><tr><th>Device</th><th></th></tr></thead>
+    <tbody>
+      {{range .Devices}}
+      <tr>
+        <td>{{.}}</td>
+        <td><a class="btn" href="/radio/{{$.File}}/{{.}}">Edit</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No radio devices set up yet.</p>
+  {{end}}
+  <div class="actions">
+    <a class="btn primary" href="/radio/{{.File}}/new">Add a radio device</a>
+  </div>
+</div>
+{{end}}
+{{template "layout" .}}

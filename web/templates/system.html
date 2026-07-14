@@ -1,0 +1,160 @@
+{{define "title"}}System{{end}}
+{{define "content"}}
+<h1>System</h1>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Device name</h2>
+    {{template "help" "The name this device uses to identify itself on your network. Purely for your own convenience — doesn't affect radio operation."}}
+  </div>
+  <form method="post" action="/system/hostname" style="margin-top:0.75rem">
+    <div class="row">
+      <div class="field">
+        <input type="text" name="hostname" value="{{.Hostname}}" pattern="[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?" required>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save name</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Network connection</h2>
+    {{template "help" "How this device gets an address on your network. Most people should leave this on \"Automatic\" — your router hands out an address for you. Only switch to \"Fixed\" if you specifically need this device to always have the same address."}}
+  </div>
+  {{if .NetError}}<p class="hint">Could not read live connection info: {{.NetError}}</p>{{end}}
+  {{if .Interfaces}}
+  <table style="margin-top:0.75rem">
+    <thead><tr><th>Connection</th><th>Current address</th></tr></thead>
+    <tbody>
+      {{range .Interfaces}}
+      {{$name := .Name}}
+      {{range .Addresses}}
+      <tr><td>{{$name}}</td><td>{{.}}</td></tr>
+      {{end}}
+      {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
+  <form method="post" action="/system/network" style="margin-top:1rem">
+    <div class="field">
+      <div class="label-row">
+        <label for="net_mode">Address mode</label>
+      </div>
+      <select id="net_mode" name="mode">
+        <option value="dhcp" {{if not .Static}}selected{{end}}>Automatic (recommended)</option>
+        <option value="static" {{if .Static}}selected{{end}}>Fixed address</option>
+      </select>
+      <div class="hint">Saved here but not applied until you reboot — so a mistake can't cut off your connection to this page mid-change.</div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="net_iface">Connection</label>
+          {{template "help" "Which network connection this applies to. \"eth0\" is the wired Ethernet port, the normal choice for a repeater that stays in one place."}}
+        </div>
+        {{if .AvailableIfaces}}
+        <select id="net_iface" name="interface">
+          {{$current := .DefaultIface}}{{if .Static}}{{$current = .Static.Interface}}{{end}}
+          {{range .AvailableIfaces}}
+          <option value="{{.}}" {{if eq . $current}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+        {{else}}
+        <input type="text" id="net_iface" name="interface" value="{{if .Static}}{{.Static.Interface}}{{else}}{{.DefaultIface}}{{end}}">
+        <div class="hint">No connections detected. If you're testing this away from the actual node, that's expected — type the name manually (usually eth0).</div>
+        {{end}}
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="net_addr">Fixed address</label>
+          {{template "help" "The address to always use, plus how much of your network it covers. /24 is standard for a typical home network — if unsure, /24 is almost always right."}}
+        </div>
+        <input type="text" id="net_addr" name="address" value="{{if .Static}}{{.Static.Address}}{{end}}" placeholder="192.168.1.10/24">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="net_router">Router address</label>
+          {{template "help" "Your router's address on the network — usually ends in .1, e.g. 192.168.1.1. Check your router if unsure."}}
+        </div>
+        <input type="text" id="net_router" name="router" value="{{if .Static}}{{.Static.Router}}{{end}}" placeholder="192.168.1.1">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="net_dns">DNS servers</label>
+          {{template "help" "Translates domain names to addresses. 8.8.8.8 (Google) is a safe default that works for almost everyone."}}
+        </div>
+        <input type="text" id="net_dns" name="dns" value="{{if .Static}}{{.Static.DNS}}{{end}}" placeholder="8.8.8.8 8.8.4.4">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save network settings</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Restart options</h2>
+  <div class="row">
+    <div class="field" style="flex:none">
+      <div class="label-row">
+        <span style="font-size:0.85rem; color:var(--text-dim)">Restart just the radio software</span>
+        {{template "help" "Restarts only the repeater/Asterisk software. Takes a few seconds, briefly interrupts the repeater, but doesn't reboot the whole device. Try this first if something seems stuck."}}
+      </div>
+      <form method="post" action="/system/restart-asterisk">
+        <button type="submit">Restart radio software</button>
+      </form>
+    </div>
+    <div class="field" style="flex:none">
+      <div class="label-row">
+        <span style="font-size:0.85rem; color:var(--text-dim)">Restart the whole device</span>
+        {{template "help" "Like unplugging and plugging the device back in. Takes about a minute. All radio connections will drop and this page will be unreachable until it comes back up."}}
+      </div>
+      <form method="post" action="/system/reboot" onsubmit="return confirm('Restart this device now? Any active radio traffic and connections will drop, and it will take about a minute to come back.')">
+        <button type="submit" class="danger">Reboot device</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Change your password</h2>
+  <form method="post" action="/system/password">
+    <div class="field">
+      <label for="pw_current">Current password</label>
+      <input type="password" id="pw_current" name="current_password" required>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="pw_new">New password</label>
+        <input type="password" id="pw_new" name="new_password" required minlength="8">
+      </div>
+      <div class="field">
+        <label for="pw_confirm">Confirm new password</label>
+        <input type="password" id="pw_confirm" name="confirm_password" required minlength="8">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Change password</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Recent technical messages</h2>
+    {{template "help" "The radio software's own internal log — useful if you're troubleshooting a problem (or if someone helping you asks to see it), but not something you need to check regularly."}}
+  </div>
+  {{if .LogError}}<p class="hint">Could not read log: {{.LogError}}</p>{{end}}
+  {{if .LogLines}}
+  <pre style="max-height:320px; overflow:auto; font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem; white-space:pre-wrap; margin-top:0.75rem;">{{range .LogLines}}{{.}}
+{{end}}</pre>
+  {{end}}
+</div>
+{{end}}
+{{template "layout" .}}

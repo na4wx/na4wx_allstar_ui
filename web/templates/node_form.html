@@ -1,0 +1,240 @@
+{{define "title"}}{{if .IsNew}}Add node{{else}}Node {{.Node.Number}}{{end}}{{end}}
+{{define "content"}}
+<h1>{{if .IsNew}}Add node{{else}}Node {{.Node.Number}}{{end}}</h1>
+
+<datalist id="radio_channel_options">
+  {{range .RadioDevices}}<option value="{{.Channel}}">{{.Label}}</option>{{end}}
+</datalist>
+
+<form method="post" action="{{if .IsNew}}/nodes{{else}}/nodes/{{.Node.Number}}{{end}}">
+  <div class="card">
+    <h2>Node identity</h2>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="number">Node number</label>
+          {{template "help" "The unique number assigned to your node when you registered at allstarlink.org, e.g. 546051."}}
+        </div>
+        <input type="text" id="number" name="number" value="{{.Node.Number}}" {{if not .IsNew}}readonly{{end}} required pattern="[0-9]+">
+        {{if not .IsNew}}<div class="hint">Node numbers can't be changed here — delete and recreate the node instead.</div>{{end}}
+      </div>
+    </div>
+    <div class="field">
+      <div class="label-row">
+        <label for="dial_string">Local connection address</label>
+        {{template "help" "A technical setting the repeater software uses internally to find itself on this device. You normally never need to change this — it's not the same as the internet registration below."}}
+      </div>
+      <input type="text" id="dial_string" name="dial_string" value="{{.Node.DialString}}" placeholder="radio@127.0.0.1:4569/{{if .Node.Number}}{{.Node.Number}}{{else}}NODE{{end}},NONE">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Radio hardware</h2>
+    <p class="section-intro">Which physical radio interface this node uses. Set devices up on the <a href="/radio">Radio page</a> first, then pick one here.</p>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="rxchannel">Radio device</label>
+          {{template "help" "The interface that receives audio from your radio. Click the field to see devices you've already set up on the Radio page."}}
+        </div>
+        <input type="text" id="rxchannel" name="rxchannel" value="{{.Node.RXChannel}}" list="radio_channel_options" placeholder="Click to choose, or type USBRADIO/usb">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="txchannel">Transmit device (rarely needed)</label>
+          {{template "help" "Only set this if your transmit audio comes from a different device than receive. The vast majority of setups use one device for both — leave this blank."}}
+        </div>
+        <input type="text" id="txchannel" name="txchannel" value="{{.Node.TXChannel}}" list="radio_channel_options" placeholder="Leave blank unless you know you need this">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="duplex">Repeater mode</label>
+          {{template "help" "Controls whether this acts as a full repeater (receive and transmit at the same time, with status beeps) or a simpler simplex setup. If you're not sure, \"full repeater\" is the normal choice."}}
+        </div>
+        <select id="duplex" name="duplex">
+          <option value="" {{if eq .Node.Duplex ""}}selected{{end}}>(not set)</option>
+          <option value="1" {{if eq .Node.Duplex "1"}}selected{{end}}>Full repeater — normal setup, with status tones</option>
+          <option value="0" {{if eq .Node.Duplex "0"}}selected{{end}}>Simplex — one frequency, no status tones</option>
+          <option value="4" {{if eq .Node.Duplex "4"}}selected{{end}}>Simplex — one frequency, with status tones</option>
+          <option value="2" {{if eq .Node.Duplex "2"}}selected{{end}}>Full repeater — quieter (fewer status tones)</option>
+          <option value="3" {{if eq .Node.Duplex "3"}}selected{{end}}>Full repeater — silent (no status tones at all)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Timing</h2>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="hangtime">Squelch tail (ms)</label>
+          {{template "help" "How long the repeater keeps transmitting after you release the mic, in thousandths of a second. 5000 = 5 seconds. Shorter feels snappier; longer avoids choppy back-and-forth conversations."}}
+        </div>
+        <input type="number" id="hangtime" name="hangtime" value="{{.Node.HangTime}}" placeholder="5000">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="althangtime">Alternate squelch tail (ms)</label>
+          {{template "help" "A second squelch tail duration used in some linked-node scenarios. Most setups can leave this blank."}}
+        </div>
+        <input type="number" id="althangtime" name="althangtime" value="{{.Node.AltHangTime}}">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="totime">Transmit safety cutoff (ms)</label>
+          {{template "help" "Stops transmitting automatically after this long, in case a radio gets stuck keyed up. 180000 = 3 minutes. This is a safety limit, not something you want people to hit in normal use."}}
+        </div>
+        <input type="number" id="totime" name="totime" value="{{.Node.TOTime}}" placeholder="180000">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="idtime">ID announcement interval (ms)</label>
+          {{template "help" "How often the repeater announces your callsign, as required by FCC rules. 300000 = 5 minutes. Must not exceed 600000 (10 minutes)."}}
+        </div>
+        <input type="number" id="idtime" name="idtime" value="{{.Node.IDTime}}" placeholder="300000">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Sounds &amp; announcements</h2>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="telemetry">Status tone set</label>
+          {{template "help" "Which set of beeps/tones the repeater plays for things like connecting or disconnecting. Leave as \"telemetry\" unless you've built a custom sound set."}}
+        </div>
+        <input type="text" id="telemetry" name="telemetry" value="{{.Node.Telemetry}}" placeholder="telemetry">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="morse">Morse code set</label>
+          {{template "help" "Which Morse code sound set to use for CW identification. Leave as \"morse\" unless customized."}}
+        </div>
+        <input type="text" id="morse" name="morse" value="{{.Node.Morse}}" placeholder="morse">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="functions">Touch-tone command set</label>
+          {{template "help" "Which set of touch-tone (DTMF) commands this node listens for — things like connecting to another node. Manage the actual commands on the Connections page."}}
+        </div>
+        <input type="text" id="functions" name="functions" value="{{.Node.Functions}}" placeholder="functions">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="macro">Saved macro set</label>
+          {{template "help" "Which set of saved multi-step command sequences this node uses (triggered by a \"macro\" touch-tone command). Manage the actual macros on the Connections page."}}
+        </div>
+        <input type="text" id="macro" name="macro" value="{{.Node.Macro}}" placeholder="macro">
+      </div>
+    </div>
+    <div class="field">
+      <div class="label-row">
+        <label for="idrecording">Station ID announcement</label>
+        {{template "help" "The voice or Morse recording that identifies your station by callsign — required periodically by FCC rules. Typically a sound file path, or |i followed by your callsign for a built-in voice."}}
+      </div>
+      <input type="text" id="idrecording" name="idrecording" value="{{.Node.IDRecording}}" placeholder="|iyourcallsign or a sound file path">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="primary">Save</button>
+    <a class="btn" href="/nodes">Cancel</a>
+    {{if not .IsNew}}
+    <span style="flex:1"></span>
+    <button type="submit" formaction="/nodes/{{.Node.Number}}/delete" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This cannot be undone.')">Delete node</button>
+    {{end}}
+  </div>
+</form>
+
+{{if not .IsNew}}
+<form method="post" action="/nodes/{{.Node.Number}}/registration">
+  <div class="card">
+    <h2>Connect to the AllStarLink network</h2>
+    <p class="section-intro">This is what lets your node talk to other stations over the internet — separate from the local connection address above, which works even without internet access.</p>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="reg_host">AllStarLink server</label>
+          {{template "help" "The server your node connects to. Use register.allstarlink.org unless AllStarLink support told you otherwise."}}
+        </div>
+        <input type="text" id="reg_host" name="reg_host" value="{{if .Registration}}{{.Registration.Host}}{{end}}" placeholder="register.allstarlink.org">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="reg_port">Port</label>
+          {{template "help" "Network port for the connection. Leave blank to use the standard port (4569) unless told otherwise."}}
+        </div>
+        <input type="text" id="reg_port" name="reg_port" value="{{if .Registration}}{{.Registration.Port}}{{end}}" placeholder="4569">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="reg_password">Registration password</label>
+          {{template "help" "The password AllStarLink gave you when you registered this node number on their website."}}
+        </div>
+        <input type="password" id="reg_password" name="reg_password" value="{{if .Registration}}{{.Registration.Password}}{{end}}" placeholder="your AllStarLink password">
+      </div>
+    </div>
+
+    <h2 style="margin-top:1.25rem">Advanced connection settings</h2>
+    <p class="section-intro">Usually only needs to be set once and left alone. The defaults shown in each field work for most nodes.</p>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="peer_type">Connection type</label>
+          {{template "help" "Almost always \"friend\" — controls how this node identifies itself when connecting."}}
+        </div>
+        <select id="peer_type" name="peer_type">
+          <option value="" {{if or (not .Peer) (eq .Peer.Type "")}}selected{{end}}>(not set)</option>
+          <option value="friend" {{if and .Peer (eq .Peer.Type "friend")}}selected{{end}}>friend (normal)</option>
+          <option value="peer" {{if and .Peer (eq .Peer.Type "peer")}}selected{{end}}>peer</option>
+          <option value="user" {{if and .Peer (eq .Peer.Type "user")}}selected{{end}}>user</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="peer_context">Routing category</label>
+          {{template "help" "Internal category for incoming connections. Typically radio-secure — don't change this unless you were specifically told to."}}
+        </div>
+        <input type="text" id="peer_context" name="peer_context" value="{{if .Peer}}{{.Peer.Context}}{{end}}" placeholder="radio-secure">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="peer_host">Network address</label>
+          {{template "help" "Almost always \"dynamic\" — meaning your node's internet address can change, which is normal for a home internet connection."}}
+        </div>
+        <input type="text" id="peer_host" name="peer_host" value="{{if .Peer}}{{.Peer.Host}}{{end}}" placeholder="dynamic">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="peer_secret">Connection password</label>
+          {{template "help" "Verifies incoming connections to this node — often the same password as the registration password above."}}
+        </div>
+        <input type="password" id="peer_secret" name="peer_secret" value="{{if .Peer}}{{.Peer.Secret}}{{end}}" placeholder="often the same as the registration password">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="peer_auth">Password check method</label>
+          {{template "help" "How the password above is verified. md5 is the common default; use whatever AllStarLink support tells you if you're unsure."}}
+        </div>
+        <select id="peer_auth" name="peer_auth">
+          <option value="" {{if or (not .Peer) (eq .Peer.Auth "")}}selected{{end}}>(not set)</option>
+          <option value="md5" {{if and .Peer (eq .Peer.Auth "md5")}}selected{{end}}>md5 (common default)</option>
+          <option value="rsa" {{if and .Peer (eq .Peer.Auth "rsa")}}selected{{end}}>rsa</option>
+          <option value="plaintext" {{if and .Peer (eq .Peer.Auth "plaintext")}}selected{{end}}>plaintext</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save registration</button>
+    </div>
+  </div>
+</form>
+{{end}}
+{{end}}
+{{template "layout" .}}

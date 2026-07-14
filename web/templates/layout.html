@@ -1,0 +1,36 @@
+{{define "help"}}<span class="help" tabindex="0"><span class="help-tip">{{.}}</span></span>{{end}}
+
+{{define "layout"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{block "title" .}}HamVoIP Config{{end}} · HamVoIP Config</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  {{if .LoggedIn}}
+  <header class="topbar">
+    <span class="brand">HamVoIP Config</span>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/nodes">Nodes</a>
+      <a href="/radio">Radio</a>
+      <a href="/connections">Connections</a>
+      <a href="/config">Raw Config</a>
+      <a href="/system">System</a>
+      <form action="/logout" method="post" style="display:inline">
+        <button type="submit" style="margin-left:1.25rem">Log out</button>
+      </form>
+    </nav>
+  </header>
+  {{end}}
+  <main>
+    {{if .Flash}}<div class="flash {{.FlashKind}}">{{.Flash}}</div>{{end}}
+    {{block "content" .}}{{end}}
+  </main>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}
