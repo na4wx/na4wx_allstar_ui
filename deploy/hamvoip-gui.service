@@ -11,7 +11,12 @@ Type=simple
 # bare "asterisk" — it isn't on this image's PATH. If yours differs,
 # check with: ls -l /usr/local/hamvoip-asterisk/sbin/asterisk (or
 # wherever `ps aux | grep asterisk` shows it actually running from).
-ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk -asterisk-bin /usr/local/hamvoip-asterisk/sbin/asterisk
+#
+# -asterisk-log is a best guess (Asterisk's standard install layout
+# puts logs under the same prefix as the binary) — NOT yet confirmed.
+# Verify with: asterisk -rx "logger show channels" and update this if
+# the real path differs.
+ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk -asterisk-bin /usr/local/hamvoip-asterisk/sbin/asterisk -asterisk-log /usr/local/hamvoip-asterisk/var/log/asterisk/full
 Restart=on-failure
 RestartSec=2
 # The GUI edits Asterisk config and calls asterisk -rx / systemctl, so it

@@ -9,13 +9,15 @@ import (
 	"hamvoipconfiggui/internal/system"
 )
 
-// These are standard paths on a stock Raspberry Pi OS / HamVoIP image.
-// They're not user-configurable from the UI since getting them wrong
-// has no graceful failure mode (a bad dhcpcd.conf path means network
-// edits silently go nowhere).
+// These are standard paths on a stock Raspberry Pi OS image. They're
+// not user-configurable from the UI since getting them wrong has no
+// graceful failure mode (a bad dhcpcd.conf path means network edits
+// silently go nowhere). The Asterisk log path is NOT included here —
+// unlike these, it varies with where Asterisk itself is installed
+// (e.g. HamVoIP's non-standard /usr/local/hamvoip-asterisk prefix), so
+// it's a Server field set from -asterisk-log instead; see main.go.
 const (
 	dhcpcdConfPath      = "/etc/dhcpcd.conf"
-	asteriskLogPath     = "/var/log/asterisk/full"
 	defaultNetInterface = "eth0"
 )
 
@@ -67,7 +69,7 @@ func (s *Server) renderSystemPage(w http.ResponseWriter, r *http.Request, pd pag
 		data.AvailableIfaces = append(data.AvailableIfaces, data.Static.Interface)
 	}
 
-	if lines, err := system.LogTail(asteriskLogPath, 100); err != nil {
+	if lines, err := system.LogTail(s.asteriskLog, 100); err != nil {
 		data.LogError = err.Error()
 	} else {
 		data.LogLines = lines

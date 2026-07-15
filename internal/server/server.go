@@ -23,6 +23,7 @@ type Server struct {
 	tmpl        map[string]*template.Template
 	mux         *http.ServeMux
 	asteriskBin string
+	asteriskLog string
 }
 
 // New builds a Server. templatesFS should contain web/templates and
@@ -35,9 +36,12 @@ type Server struct {
 // the Connections page's live status/DTMF relay) goes through this
 // binary's own CLI rather than systemd, since Asterisk is very often
 // supervised some other way (e.g. a safe_asterisk watchdog script)
-// rather than as a native systemd unit.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin}
+// rather than as a native systemd unit. asteriskLog is the path to
+// Asterisk's full log file, shown on the System page — like
+// asteriskBin, it follows wherever Asterisk is actually installed
+// rather than a fixed standard location.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog}
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {

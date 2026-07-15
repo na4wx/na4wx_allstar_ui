@@ -61,7 +61,17 @@ func isRadioFile(file string) bool {
 	return file == UsbradioConfFile || file == SimpleusbConfFile
 }
 
-// ListRadioDevices returns device stanza names in file order.
+// nonDeviceSections lists stanza names that show up in
+// usbradio.conf/simpleusb.conf but aren't devices — [general] is the
+// standard Asterisk convention for a driver-wide defaults section
+// (confirmed present, and empty, on a real HamVoIP node), not
+// something app_rpt's rxchannel would ever reference.
+var nonDeviceSections = map[string]bool{
+	"general": true,
+}
+
+// ListRadioDevices returns device stanza names in file order, excluding
+// non-device sections like [general].
 func (s *Store) ListRadioDevices(file string) ([]string, error) {
 	if !isRadioFile(file) {
 		return nil, fmt.Errorf("config: %s is not a radio interface file", file)
@@ -72,13 +82,22 @@ func (s *Store) ListRadioDevices(file string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return f.Sections(), nil
+	var devices []string
+	for _, sec := range f.Sections() {
+		if !nonDeviceSections[sec] {
+			devices = append(devices, sec)
+		}
+	}
+	return devices, nil
 }
 
 // LoadRadioDevice reads one device stanza from file.
 func (s *Store) LoadRadioDevice(file, name string) (*RadioDevice, error) {
 	if !isRadioFile(file) {
 		return nil, fmt.Errorf("config: %s is not a radio interface file", file)
+	}
+	if nonDeviceSections[name] {
+		return nil, fmt.Errorf("config: %q is not a device section", name)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -106,6 +125,9 @@ func (s *Store) SaveRadioDevice(file string, d *RadioDevice) error {
 	}
 	if d.Name == "" {
 		return fmt.Errorf("config: device name is required")
+	}
+	if nonDeviceSections[d.Name] {
+		return fmt.Errorf("config: %q is a reserved section name, not a valid device name", d.Name)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

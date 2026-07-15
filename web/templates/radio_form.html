@@ -25,12 +25,12 @@
     <div class="field">
       <div class="label-row">
         <label for="name">Device name</label>
-        {{template "help" "This name must exactly match how your Pi identifies the USB sound fob. Click the field to pick from devices currently plugged in, or type it manually if you know the name."}}
+        {{template "help" "A label you choose for this device — it needs to match what your node's rxchannel setting (on the Nodes page) references, e.g. USBRADIO/usb. It does not need to match your hardware's own ALSA name below; on a real node those were confirmed to differ (label \"usb\", hardware name \"Device\") with no ill effect."}}
       </div>
       {{if .IsNew}}
-      <input type="text" id="name" name="name" value="{{.Device.Name}}" list="detected_sound_cards" required placeholder="Click to choose a plugged-in device, or type a name">
+      <input type="text" id="name" name="name" value="{{.Device.Name}}" list="detected_sound_cards" required placeholder="e.g. usb — or click for what's plugged in">
       {{if .DetectedCards}}
-      <div class="hint">Detected right now: {{range $i, $c := .DetectedCards}}{{if $i}}, {{end}}{{.ID}}{{if .Description}} ({{.Description}}){{end}}{{end}}</div>
+      <div class="hint">Plugged in right now (for reference — the label above doesn't need to match this): {{range $i, $c := .DetectedCards}}{{if $i}}, {{end}}{{.ID}}{{if .Description}} ({{.Description}}){{end}}{{end}}</div>
       {{else}}
       <div class="hint">No USB sound devices detected. If you're testing this away from the actual node, that's expected — type the name manually.</div>
       {{end}}

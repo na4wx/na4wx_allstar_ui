@@ -38,6 +38,44 @@ func TestListRadioDevices(t *testing.T) {
 	}
 }
 
+// Regression test for a real deployment finding: a stock HamVoIP node's
+// simpleusb.conf has an empty [general] defaults section (standard
+// Asterisk driver-config convention) alongside real device sections —
+// [general] must not show up as a fake "device".
+const testSimpleusbConfWithGeneral = `[general]
+
+[usb]
+carrierfrom = usbinvert
+ctcssfrom = no
+invertptt = 0
+`
+
+func TestListRadioDevicesExcludesGeneral(t *testing.T) {
+	s := newRadioTestStore(t, SimpleusbConfFile, testSimpleusbConfWithGeneral)
+	devices, err := s.ListRadioDevices(SimpleusbConfFile)
+	if err != nil {
+		t.Fatalf("ListRadioDevices: %v", err)
+	}
+	if len(devices) != 1 || devices[0] != "usb" {
+		t.Fatalf("ListRadioDevices = %v, want [usb] (general excluded)", devices)
+	}
+}
+
+func TestLoadRadioDeviceRejectsGeneral(t *testing.T) {
+	s := newRadioTestStore(t, SimpleusbConfFile, testSimpleusbConfWithGeneral)
+	if _, err := s.LoadRadioDevice(SimpleusbConfFile, "general"); err == nil {
+		t.Fatalf("expected error loading [general] as a device")
+	}
+}
+
+func TestSaveRadioDeviceRejectsGeneral(t *testing.T) {
+	s := newRadioTestStore(t, SimpleusbConfFile, testSimpleusbConfWithGeneral)
+	err := s.SaveRadioDevice(SimpleusbConfFile, &RadioDevice{Name: "general", CarrierFrom: "usb"})
+	if err == nil {
+		t.Fatalf("expected error saving a device named \"general\"")
+	}
+}
+
 func TestListRadioDevicesRejectsWrongFile(t *testing.T) {
 	s := newRadioTestStore(t, UsbradioConfFile, testUsbradioConf)
 	if _, err := s.ListRadioDevices("rpt.conf"); err == nil {

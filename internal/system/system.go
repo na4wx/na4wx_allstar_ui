@@ -183,10 +183,12 @@ func LogTail(path string, n int) ([]string, error) {
 
 // SoundCard is one entry from /proc/asound/cards: a sound device the
 // kernel currently sees, which is what a HamVoIP node's USB radio
-// interface shows up as. HamVoIP conventionally renames each card's ID
-// to match the device name used in usbradio.conf/simpleusb.conf (e.g.
-// "usb", "usb1") via a udev rule, so the ID here is normally exactly
-// what a device stanza should be named.
+// interface shows up as. The ALSA card ID here is *not* guaranteed to
+// match the device stanza name used in usbradio.conf/simpleusb.conf
+// (confirmed on a real node: the card ID was the generic "Device"
+// while the configured section was "[usb]") — it's offered as a
+// suggestion for what's physically plugged in, not an authoritative
+// mapping to a config section name.
 type SoundCard struct {
 	Index       int
 	ID          string
