@@ -33,11 +33,13 @@ func AsteriskRX(ctx context.Context, cmd string) (string, error) {
 	return out.String(), nil
 }
 
-// AsteriskRunning reports whether the asterisk service is active.
-func AsteriskRunning(ctx context.Context) bool {
+// AsteriskRunning reports whether the given systemd unit (Asterisk's
+// service name, which varies between distributions — see the
+// -asterisk-service flag) is active.
+func AsteriskRunning(ctx context.Context, unit string) bool {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "systemctl", "is-active", "asterisk").Output()
+	out, err := exec.CommandContext(ctx, "systemctl", "is-active", unit).Output()
 	return err == nil && strings.TrimSpace(string(out)) == "active"
 }
 
@@ -251,11 +253,11 @@ type Status struct {
 
 // Snapshot gathers a Status, best-effort: individual command failures are
 // recorded in Error but do not abort the rest of the snapshot.
-func Snapshot(ctx context.Context) Status {
+func Snapshot(ctx context.Context, asteriskUnit string) Status {
 	var s Status
 	var errs []string
 
-	s.AsteriskRunning = AsteriskRunning(ctx)
+	s.AsteriskRunning = AsteriskRunning(ctx, asteriskUnit)
 
 	if up, err := Uptime(ctx); err != nil {
 		errs = append(errs, "uptime: "+err.Error())

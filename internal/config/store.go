@@ -29,10 +29,18 @@ func (s *Store) path(name string) string {
 	return filepath.Join(s.dir, name)
 }
 
-// load parses a config file relative to the store's directory. Caller
-// must hold s.mu.
+// load parses a config file relative to the store's directory. A file
+// that doesn't exist yet is treated as a valid, empty config rather
+// than an error — HamVoIP nodes commonly have only one of
+// usbradio.conf/simpleusb.conf present (never both), and in general
+// nothing here should hard-fail a page just because a file it hasn't
+// needed yet was never created. The first Save* call against it will
+// create the file. Caller must hold s.mu.
 func (s *Store) load(name string) (*asteriskconf.File, error) {
 	f, err := asteriskconf.ParseFile(s.path(name))
+	if os.IsNotExist(err) {
+		return &asteriskconf.File{}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("config: load %s: %w", name, err)
 	}

@@ -1,11 +1,16 @@
 [Unit]
 Description=HamVoIP Config GUI
+# "asterisk.service" is a guess — it varies by distro/image. If
+# `systemctl list-units | grep -i aster` on this node shows a different
+# unit name, update it here AND pass the same name via -asterisk-service
+# below (that flag controls what the Restart Asterisk button and the
+# dashboard's running/stopped status actually check).
 After=network.target asterisk.service
 Wants=asterisk.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk
+ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk -asterisk-service asterisk
 Restart=on-failure
 RestartSec=2
 # The GUI edits Asterisk config and calls asterisk -rx / systemctl, so it

@@ -56,10 +56,19 @@ Visit `http://<pi-ip>:8088/setup` to create the admin account — there is no de
 ## Command-line flags
 
 ```
--addr           listen address (default ":8088")
--asterisk-etc   path to Asterisk's config directory (default "/etc/asterisk")
--auth-file      path to store admin credentials (default "/etc/hamvoip-gui/auth.json")
+-addr               listen address (default ":8088")
+-asterisk-etc       path to Asterisk's config directory (default "/etc/asterisk")
+-auth-file          path to store admin credentials (default "/etc/hamvoip-gui/auth.json")
+-asterisk-service   systemd unit name Asterisk runs under (default "asterisk")
 ```
+
+`-asterisk-service` controls what the dashboard's running/stopped indicator checks and what the System page's "Restart radio software" button restarts. The default (`asterisk`) is a guess — it varies by image. If restarting fails with something like `Unit asterisk.service not found`, find the real name with:
+
+```sh
+systemctl list-units --type=service | grep -i aster
+```
+
+and pass it explicitly (also update `ExecStart` in `deploy/hamvoip-gui.service` to match, then `sudo systemctl daemon-reload && sudo systemctl restart hamvoip-gui`).
 
 ## Testing
 

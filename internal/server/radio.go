@@ -13,6 +13,20 @@ func isRadioFileParam(file string) bool {
 	return file == config.UsbradioConfFile || file == config.SimpleusbConfFile
 }
 
+// defaultRadioFile picks which of usbradio.conf/simpleusb.conf to show
+// when the user hasn't picked one explicitly: whichever one actually
+// has devices configured, falling back to usbradio.conf (the more
+// common driver) if neither does or if detection fails.
+func (s *Server) defaultRadioFile() string {
+	if devices, err := s.store.ListRadioDevices(config.UsbradioConfFile); err == nil && len(devices) > 0 {
+		return config.UsbradioConfFile
+	}
+	if devices, err := s.store.ListRadioDevices(config.SimpleusbConfFile); err == nil && len(devices) > 0 {
+		return config.SimpleusbConfFile
+	}
+	return config.UsbradioConfFile
+}
+
 // standardCTCSSTones is the standard EIA set of sub-audible tone
 // frequencies (Hz) used across ham and land-mobile radio, offered as
 // suggestions on the transmit tone field — not an exhaustive validation
@@ -33,12 +47,15 @@ type radioIndexData struct {
 	Devices []string
 }
 
-// handleRadioIndex lists devices for one radio file (defaulting to
-// usbradio.conf) with a picker for the other.
+// handleRadioIndex lists devices for one radio file. If the file isn't
+// specified via ?file=, defaults to whichever of usbradio.conf/
+// simpleusb.conf actually has devices in it — a node only ever uses
+// one of the two, so this avoids landing on a blank page just because
+// it happened to be the other one.
 func (s *Server) handleRadioIndex(w http.ResponseWriter, r *http.Request) {
 	file := r.URL.Query().Get("file")
 	if !isRadioFileParam(file) {
-		file = config.UsbradioConfFile
+		file = s.defaultRadioFile()
 	}
 	devices, err := s.store.ListRadioDevices(file)
 	if err != nil {

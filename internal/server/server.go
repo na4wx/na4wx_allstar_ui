@@ -18,17 +18,21 @@ import (
 const sessionCookie = "hamvoip_gui_session"
 
 type Server struct {
-	store *config.Store
-	auth  *auth.Manager
-	tmpl  map[string]*template.Template
-	mux   *http.ServeMux
+	store        *config.Store
+	auth         *auth.Manager
+	tmpl         map[string]*template.Template
+	mux          *http.ServeMux
+	asteriskUnit string
 }
 
 // New builds a Server. templatesFS should contain web/templates and
 // staticFS should contain web/static (both typically embed.FS values
-// from main).
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux()}
+// from main). asteriskUnit is the systemd unit name Asterisk runs
+// under — it varies between distributions, so it's a caller-supplied
+// value rather than a hardcoded "asterisk" (see the -asterisk-service
+// flag in main.go).
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskUnit string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskUnit: asteriskUnit}
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {
@@ -249,7 +253,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		nodes = append(nodes, node)
 	}
-	status := system.Snapshot(r.Context())
+	status := system.Snapshot(r.Context(), s.asteriskUnit)
 	s.render(w, "dashboard.html", struct {
 		pageData
 		Nodes  []*config.Node
@@ -260,6 +264,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	status := system.Snapshot(ctx)
+	status := system.Snapshot(ctx, s.asteriskUnit)
 	writeJSON(w, status)
 }

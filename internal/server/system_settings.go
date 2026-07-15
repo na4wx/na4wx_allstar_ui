@@ -149,7 +149,7 @@ func (s *Server) handleSystemNetwork(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSystemRestartAsterisk(w http.ResponseWriter, r *http.Request) {
-	if err := system.ServiceRestart(r.Context(), "asterisk"); err != nil {
+	if err := system.ServiceRestart(r.Context(), s.asteriskUnit); err != nil {
 		s.renderSystemPage(w, r, flash("error", err.Error()))
 		return
 	}
