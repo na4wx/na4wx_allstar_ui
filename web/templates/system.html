@@ -99,6 +99,32 @@
 </div>
 
 <div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">SHARI USB quick setup</h2>
+    {{template "help" "One-click fill for the USB audio settings a SHARI USB interface needs, sourced from the SHARI setup documentation. This only covers the USB sound codec side (carrier detection, pre/de-emphasis, PL filter). It does not set the radio module's frequency, CTCSS tone, or squelch — those are programmed separately over a serial connection to the SA818 module, which isn't handled here yet."}}
+  </div>
+  {{if .RadioDevices}}
+  <form method="post" action="/system/sharipi/apply">
+    <div class="row">
+      <div class="field">
+        <label for="sharipi_device">Which radio device is this?</label>
+        <select id="sharipi_device" name="device_ref">
+          {{range .RadioDevices}}
+          <option value="{{.File}}|{{.Name}}">{{.Label}}</option>
+          {{end}}
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Apply SHARI USB audio settings</button>
+    </div>
+  </form>
+  {{else}}
+  <p class="hint">No radio devices set up yet — add one on the <a href="/radio">Radio page</a> first, then come back here to apply the SHARI USB preset to it.</p>
+  {{end}}
+</div>
+
+<div class="card">
   <h2>Restart options</h2>
   <div class="row">
     <div class="field" style="flex:none">

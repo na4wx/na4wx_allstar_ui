@@ -112,6 +112,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /system/hostname", s.requireAuth(s.handleSystemHostname))
 	s.mux.HandleFunc("POST /system/password", s.requireAuth(s.handleSystemPassword))
 	s.mux.HandleFunc("POST /system/network", s.requireAuth(s.handleSystemNetwork))
+	s.mux.HandleFunc("POST /system/sharipi/apply", s.requireAuth(s.handleSystemShariApply))
 	s.mux.HandleFunc("POST /system/restart-asterisk", s.requireAuth(s.handleSystemRestartAsterisk))
 	s.mux.HandleFunc("POST /system/reboot", s.requireAuth(s.handleSystemReboot))
 }

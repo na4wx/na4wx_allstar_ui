@@ -13,6 +13,34 @@ func isRadioFileParam(file string) bool {
 	return file == config.UsbradioConfFile || file == config.SimpleusbConfFile
 }
 
+// radioDeviceRef identifies one configured device by which file it
+// lives in plus its stanza name — unlike radioChannelOption (in
+// nodes.go), which combines them into a single rpt.conf rxchannel
+// string, callers here need the file and name separately to load/save
+// the device directly.
+type radioDeviceRef struct {
+	File  string
+	Name  string
+	Label string
+}
+
+// listAllRadioDevices returns every configured device across both
+// driver files, for pickers that operate on a device directly rather
+// than referencing it from rpt.conf.
+func (s *Server) listAllRadioDevices() []radioDeviceRef {
+	var refs []radioDeviceRef
+	for _, file := range radioFiles {
+		devices, err := s.store.ListRadioDevices(file)
+		if err != nil {
+			continue
+		}
+		for _, name := range devices {
+			refs = append(refs, radioDeviceRef{File: file, Name: name, Label: name + " (" + file + ")"})
+		}
+	}
+	return refs
+}
+
 // defaultRadioFile picks which of usbradio.conf/simpleusb.conf to show
 // when the user hasn't picked one explicitly: whichever one actually
 // has devices configured, falling back to usbradio.conf (the more
@@ -134,6 +162,9 @@ func radioDeviceFromForm(r *http.Request, name string) *config.RadioDevice {
 		RXMixerSet:     r.FormValue("rxmixerset"),
 		TXMixerSet:     r.FormValue("txmixerset"),
 		RXBoost:        r.FormValue("rxboost"),
+		PreEmphasis:    r.FormValue("preemphasis"),
+		DeEmphasis:     r.FormValue("deemphasis"),
+		PLFilter:       r.FormValue("plfilter"),
 		HdwType:        r.FormValue("hdwtype"),
 		Duplex3:        r.FormValue("duplex3"),
 	}

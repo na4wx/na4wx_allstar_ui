@@ -76,6 +76,51 @@ func TestSaveRadioDeviceRejectsGeneral(t *testing.T) {
 	}
 }
 
+func TestApplyShariUSBPresetOverwritesOnlyDocumentedFields(t *testing.T) {
+	d := &RadioDevice{
+		Name:        "usb",
+		CarrierFrom: "usb", // should be overwritten
+		CTCSSFrom:   "dsp", // should be overwritten
+		RXBoost:     "1",   // should be overwritten
+		RXMixerSet:  "375", // must survive untouched
+		TXMixerSet:  "500", // must survive untouched
+	}
+	ApplyShariUSBPreset(d)
+
+	if d.CarrierFrom != "usbinvert" || d.CTCSSFrom != "no" || d.RXBoost != "0" {
+		t.Fatalf("preset fields not applied: %+v", d)
+	}
+	if d.PreEmphasis != "1" || d.DeEmphasis != "1" || d.PLFilter != "1" {
+		t.Fatalf("emphasis/filter fields not applied: %+v", d)
+	}
+	if d.RXMixerSet != "375" || d.TXMixerSet != "500" {
+		t.Fatalf("preset should not touch audio levels, got: %+v", d)
+	}
+	if d.Name != "usb" {
+		t.Fatalf("preset should not touch device name, got: %+v", d)
+	}
+}
+
+func TestPreEmphasisDeEmphasisPLFilterRoundTrip(t *testing.T) {
+	s := newRadioTestStore(t, SimpleusbConfFile, testUsbradioConf)
+	d, err := s.LoadRadioDevice(SimpleusbConfFile, "usb")
+	if err != nil {
+		t.Fatalf("LoadRadioDevice: %v", err)
+	}
+	ApplyShariUSBPreset(d)
+	if err := s.SaveRadioDevice(SimpleusbConfFile, d); err != nil {
+		t.Fatalf("SaveRadioDevice: %v", err)
+	}
+
+	got, err := s.LoadRadioDevice(SimpleusbConfFile, "usb")
+	if err != nil {
+		t.Fatalf("LoadRadioDevice after save: %v", err)
+	}
+	if got.PreEmphasis != "1" || got.DeEmphasis != "1" || got.PLFilter != "1" {
+		t.Fatalf("fields did not round-trip: %+v", got)
+	}
+}
+
 func TestListRadioDevicesRejectsWrongFile(t *testing.T) {
 	s := newRadioTestStore(t, UsbradioConfFile, testUsbradioConf)
 	if _, err := s.ListRadioDevices("rpt.conf"); err == nil {

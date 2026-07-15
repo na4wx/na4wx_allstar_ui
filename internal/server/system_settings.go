@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/netconfig"
 	"hamvoipconfiggui/internal/system"
 )
@@ -31,6 +32,7 @@ type systemPageData struct {
 	LogLines        []string
 	LogError        string
 	NetError        string
+	RadioDevices    []radioDeviceRef
 }
 
 func (s *Server) handleSystemPage(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +76,8 @@ func (s *Server) renderSystemPage(w http.ResponseWriter, r *http.Request, pd pag
 	} else {
 		data.LogLines = lines
 	}
+
+	data.RadioDevices = s.listAllRadioDevices()
 
 	s.render(w, "system.html", data)
 }
@@ -148,6 +152,34 @@ func (s *Server) handleSystemNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderSystemPage(w, r, flash("ok", "Network configuration saved. Reboot to apply it — this does not take effect until then."))
+}
+
+// handleSystemShariApply applies the documented SHARI USB audio preset
+// (see config.ApplyShariUSBPreset) to an existing radio device. It only
+// touches the USB audio codec settings — SA818 frequency/tone/squelch
+// programming is a separate serial-based step this doesn't cover.
+func (s *Server) handleSystemShariApply(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	file, name, ok := strings.Cut(r.FormValue("device_ref"), "|")
+	if !ok || !isRadioFileParam(file) || name == "" {
+		s.renderSystemPage(w, r, flash("error", "Pick a radio device first"))
+		return
+	}
+
+	d, err := s.store.LoadRadioDevice(file, name)
+	if err != nil {
+		s.renderSystemPage(w, r, flash("error", err.Error()))
+		return
+	}
+	config.ApplyShariUSBPreset(d)
+	if err := s.store.SaveRadioDevice(file, d); err != nil {
+		s.renderSystemPage(w, r, flash("error", err.Error()))
+		return
+	}
+	s.renderSystemPage(w, r, flash("ok", "Applied SHARI USB audio settings to "+name+" ("+file+"). This does not set frequency/tone on the radio module itself — that's a separate step."))
 }
 
 func (s *Server) handleSystemRestartAsterisk(w http.ResponseWriter, r *http.Request) {

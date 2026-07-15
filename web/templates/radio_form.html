@@ -83,6 +83,54 @@
         </select>
       </div>
     </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="rxboost">Extra receive gain</label>
+          {{template "help" "Adds additional receive amplification for weak audio. Only turn this on if received audio still sounds too quiet at maximum receive volume below."}}
+        </div>
+        <select id="rxboost" name="rxboost">
+          <option value="" {{if eq .Device.RXBoost ""}}selected{{end}}>(not set)</option>
+          <option value="0" {{if eq .Device.RXBoost "0"}}selected{{end}}>Off (normal)</option>
+          <option value="1" {{if eq .Device.RXBoost "1"}}selected{{end}}>On (boost)</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="preemphasis">Pre-emphasis</label>
+          {{template "help" "A transmit audio shaping option some radio interfaces need. Leave at the default unless your hardware's documentation says to enable it."}}
+        </div>
+        <select id="preemphasis" name="preemphasis">
+          <option value="" {{if eq .Device.PreEmphasis ""}}selected{{end}}>(not set)</option>
+          <option value="0" {{if eq .Device.PreEmphasis "0"}}selected{{end}}>Disabled</option>
+          <option value="1" {{if eq .Device.PreEmphasis "1"}}selected{{end}}>Enabled</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="deemphasis">De-emphasis</label>
+          {{template "help" "The matching receive-side counterpart to pre-emphasis. Leave at the default unless your hardware's documentation says to enable it."}}
+        </div>
+        <select id="deemphasis" name="deemphasis">
+          <option value="" {{if eq .Device.DeEmphasis ""}}selected{{end}}>(not set)</option>
+          <option value="0" {{if eq .Device.DeEmphasis "0"}}selected{{end}}>Disabled</option>
+          <option value="1" {{if eq .Device.DeEmphasis "1"}}selected{{end}}>Enabled</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="plfilter">CTCSS tone filter</label>
+          {{template "help" "Filters the sub-audible CTCSS tone out of the audio that gets repeated, so listeners don't hear a faint tone underneath. Most setups leave this enabled."}}
+        </div>
+        <select id="plfilter" name="plfilter">
+          <option value="" {{if eq .Device.PLFilter ""}}selected{{end}}>(not set)</option>
+          <option value="0" {{if eq .Device.PLFilter "0"}}selected{{end}}>Disabled</option>
+          <option value="1" {{if eq .Device.PLFilter "1"}}selected{{end}}>Enabled</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -162,17 +210,6 @@
     <h2>Advanced hardware settings</h2>
     <p class="section-intro">Specific to this driver. Leave at the defaults unless your interface board's documentation says otherwise.</p>
     <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="rxboost">Extra receive gain</label>
-          {{template "help" "Adds additional receive amplification for weak audio. Only turn this on if received audio still sounds too quiet at maximum receive volume above."}}
-        </div>
-        <select id="rxboost" name="rxboost">
-          <option value="" {{if eq .Device.RXBoost ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.RXBoost "0"}}selected{{end}}>Off (normal)</option>
-          <option value="1" {{if eq .Device.RXBoost "1"}}selected{{end}}>On (boost)</option>
-        </select>
-      </div>
       <div class="field">
         <div class="label-row">
           <label for="hdwtype">Interface board model</label>

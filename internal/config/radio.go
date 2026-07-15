@@ -28,9 +28,17 @@ type RadioDevice struct {
 	TXCTCSSDefault string // tone frequency, e.g. "100.0"
 	RXMixerSet     string // 0-999 receive volume
 	TXMixerSet     string // 0-999 transmit volume
+	RXBoost        string // 0 | 1 — confirmed present on a real simpleusb.conf, not usbradio-only as once assumed here
+
+	// PreEmphasis/DeEmphasis/PLFilter key names are inferred from the
+	// simpleusb-tune-menu tool's on-screen labels ("PRE-emphasis",
+	// "DE-emphasis", "PLfilter") rather than directly confirmed on a
+	// live node the way the other fields were — correct if wrong.
+	PreEmphasis string // 0 | 1
+	DeEmphasis  string // 0 | 1
+	PLFilter    string // 0 | 1
 
 	// usbradio.conf only (chan_usbradio, not chan_simpleusb).
-	RXBoost string // 0 | 1
 	HdwType string // 0 | 1
 	Duplex3 string // 0 | 1
 }
@@ -50,6 +58,9 @@ var radioDeviceFields = []struct {
 	{"rxmixerset", func(d *RadioDevice) *string { return &d.RXMixerSet }},
 	{"txmixerset", func(d *RadioDevice) *string { return &d.TXMixerSet }},
 	{"rxboost", func(d *RadioDevice) *string { return &d.RXBoost }},
+	{"preemphasis", func(d *RadioDevice) *string { return &d.PreEmphasis }},
+	{"deemphasis", func(d *RadioDevice) *string { return &d.DeEmphasis }},
+	{"plfilter", func(d *RadioDevice) *string { return &d.PLFilter }},
 	{"hdwtype", func(d *RadioDevice) *string { return &d.HdwType }},
 	{"duplex3", func(d *RadioDevice) *string { return &d.Duplex3 }},
 }
@@ -59,6 +70,24 @@ var radioDeviceFields = []struct {
 // HTTP with the filename taken from the URL.
 func isRadioFile(file string) bool {
 	return file == UsbradioConfFile || file == SimpleusbConfFile
+}
+
+// ApplyShariUSBPreset overwrites just the fields the SHARI USB
+// interface is documented to need, leaving everything else on d
+// (audio levels, tone frequency, etc.) untouched. Sourced from two
+// independent write-ups that agree on these values — the SHARI PiHat
+// setup guide (N8AR / kits4hams.com) and a community configuration
+// post (gc0ezq.com) — for the SimpleUSB audio codec side only. This
+// does NOT touch the SA818 radio module itself (frequency, CTCSS,
+// squelch, transmit power) — that's programmed separately over a
+// serial connection, not stored in this config file.
+func ApplyShariUSBPreset(d *RadioDevice) {
+	d.CarrierFrom = "usbinvert"
+	d.CTCSSFrom = "no"
+	d.RXBoost = "0"
+	d.PreEmphasis = "1"
+	d.DeEmphasis = "1"
+	d.PLFilter = "1"
 }
 
 // nonDeviceSections lists stanza names that show up in
