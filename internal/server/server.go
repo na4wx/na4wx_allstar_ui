@@ -18,12 +18,14 @@ import (
 const sessionCookie = "hamvoip_gui_session"
 
 type Server struct {
-	store       *config.Store
-	auth        *auth.Manager
-	tmpl        map[string]*template.Template
-	mux         *http.ServeMux
-	asteriskBin string
-	asteriskLog string
+	store          *config.Store
+	auth           *auth.Manager
+	tmpl           map[string]*template.Template
+	mux            *http.ServeMux
+	asteriskBin    string
+	asteriskLog    string
+	sa818Tool      string
+	sa818StatePath string
 }
 
 // New builds a Server. templatesFS should contain web/templates and
@@ -39,9 +41,12 @@ type Server struct {
 // rather than as a native systemd unit. asteriskLog is the path to
 // Asterisk's full log file, shown on the System page — like
 // asteriskBin, it follows wherever Asterisk is actually installed
-// rather than a fixed standard location.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog}
+// rather than a fixed standard location. sa818Tool is the path (or bare
+// name, if on PATH) to the 818-prog SA818/DRA818 radio module
+// programmer used by the System page's radio module card; sa818StatePath
+// is where the last settings sent to it are recorded (see internal/sa818).
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath}
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {
@@ -113,6 +118,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /system/password", s.requireAuth(s.handleSystemPassword))
 	s.mux.HandleFunc("POST /system/network", s.requireAuth(s.handleSystemNetwork))
 	s.mux.HandleFunc("POST /system/sharipi/apply", s.requireAuth(s.handleSystemShariApply))
+	s.mux.HandleFunc("POST /system/sa818/apply", s.requireAuth(s.handleSystemSA818Apply))
 	s.mux.HandleFunc("POST /system/restart-asterisk", s.requireAuth(s.handleSystemRestartAsterisk))
 	s.mux.HandleFunc("POST /system/reboot", s.requireAuth(s.handleSystemReboot))
 }

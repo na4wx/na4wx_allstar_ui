@@ -124,6 +124,115 @@
   {{end}}
 </div>
 
+{{$last := .SA818Last}}
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">SA818 radio module (frequency / tone / squelch)</h2>
+    {{template "help" "Programs the SHARI USB's SA818/DRA818 radio module directly over its serial connection, using the 818-prog tool. This is write-only — the module has no way to report back its currently-programmed values, so there's nothing to \"read\" from the hardware itself. What's shown below is only a record of the last settings this page sent, and whether the module accepted them."}}
+  </div>
+  <p class="section-intro">Runs <code>{{.SA818Tool}}</code> with these values, the same as answering its prompts by hand. If it's not installed or not on the PATH, this will fail with a clear error.</p>
+  <form method="post" action="/system/sa818/apply">
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_wide">Channel spacing</label>
+          {{template "help" "Narrow (12.5 kHz) is standard for most amateur repeater channels. On a real test, selecting \"Narrow\" here still resulted in the tool sending \"1\" to the module — an unexplained quirk of the tool, not something this app controls. Watch the raw output below to see what was actually sent."}}
+        </div>
+        <select id="sa818_wide" name="wide">
+          <option value="0" {{if or (not $last) (not $last.Wide)}}selected{{end}}>Narrow (12.5 kHz) — most common</option>
+          <option value="1" {{if and $last $last.Wide}}selected{{end}}>Wide (25 kHz)</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_squelch">Squelch (1-9)</label>
+          {{template "help" "Higher numbers require a stronger signal before the module opens. 4 is a typical starting point."}}
+        </div>
+        <select id="sa818_squelch" name="squelch">
+          <option value="1" {{if $last}}{{if eq $last.Squelch 1}}selected{{end}}{{end}}>1</option>
+          <option value="2" {{if $last}}{{if eq $last.Squelch 2}}selected{{end}}{{end}}>2</option>
+          <option value="3" {{if $last}}{{if eq $last.Squelch 3}}selected{{end}}{{end}}>3</option>
+          <option value="4" {{if $last}}{{if eq $last.Squelch 4}}selected{{end}}{{else}}selected{{end}}>4</option>
+          <option value="5" {{if $last}}{{if eq $last.Squelch 5}}selected{{end}}{{end}}>5</option>
+          <option value="6" {{if $last}}{{if eq $last.Squelch 6}}selected{{end}}{{end}}>6</option>
+          <option value="7" {{if $last}}{{if eq $last.Squelch 7}}selected{{end}}{{end}}>7</option>
+          <option value="8" {{if $last}}{{if eq $last.Squelch 8}}selected{{end}}{{end}}>8</option>
+          <option value="9" {{if $last}}{{if eq $last.Squelch 9}}selected{{end}}{{end}}>9</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_volume">Volume (0-8)</label>
+          {{template "help" "The module's own audio output level. 5 is a typical starting point — fine-tune by ear."}}
+        </div>
+        <select id="sa818_volume" name="volume">
+          <option value="0" {{if $last}}{{if eq $last.Volume 0}}selected{{end}}{{end}}>0</option>
+          <option value="1" {{if $last}}{{if eq $last.Volume 1}}selected{{end}}{{end}}>1</option>
+          <option value="2" {{if $last}}{{if eq $last.Volume 2}}selected{{end}}{{end}}>2</option>
+          <option value="3" {{if $last}}{{if eq $last.Volume 3}}selected{{end}}{{end}}>3</option>
+          <option value="4" {{if $last}}{{if eq $last.Volume 4}}selected{{end}}{{end}}>4</option>
+          <option value="5" {{if $last}}{{if eq $last.Volume 5}}selected{{end}}{{else}}selected{{end}}>5</option>
+          <option value="6" {{if $last}}{{if eq $last.Volume 6}}selected{{end}}{{end}}>6</option>
+          <option value="7" {{if $last}}{{if eq $last.Volume 7}}selected{{end}}{{end}}>7</option>
+          <option value="8" {{if $last}}{{if eq $last.Volume 8}}selected{{end}}{{end}}>8</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_tx_freq">Transmit frequency (MHz)</label>
+          {{template "help" "e.g. 446.1000. Enter as many decimal places as you know — this app pads it to the exact xxx.xxxx format the module expects."}}
+        </div>
+        <input type="text" id="sa818_tx_freq" name="tx_freq" value="{{if $last}}{{$last.TxFreqMHz}}{{end}}" placeholder="446.1000" required>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_rx_freq">Receive frequency (MHz)</label>
+          {{template "help" "Only differs from transmit frequency on a repeater with split input/output. For a simplex SHARI node, this is normally the same as transmit."}}
+        </div>
+        <input type="text" id="sa818_rx_freq" name="rx_freq" value="{{if $last}}{{$last.RxFreqMHz}}{{end}}" placeholder="Same as transmit if left blank">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_tx_ctcss">Transmit CTCSS code</label>
+          {{template "help" "The module's own hardware CTCSS code, if you want the module itself (rather than the software on this page's Radio tab) to encode a tone. This is NOT the same as the Hz-based tone list on the Radio page, and the code-to-Hz mapping for this module isn't independently verified here — most SHARI USB setups leave this at 0000 (no tone) and let the software handle CTCSS instead."}}
+        </div>
+        <input type="text" id="sa818_tx_ctcss" name="tx_ctcss" value="{{if $last}}{{$last.TxCTCSS}}{{end}}" placeholder="0000">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="sa818_rx_ctcss">Receive CTCSS code</label>
+          {{template "help" "Same caveat as transmit CTCSS code — leave at 0000 unless you specifically know the code your module needs."}}
+        </div>
+        <input type="text" id="sa818_rx_ctcss" name="rx_ctcss" value="{{if $last}}{{$last.RxCTCSS}}{{end}}" placeholder="0000">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:none">
+        <label><input type="checkbox" name="pre_de_emphasis" value="1" {{if and $last $last.PreDeEmphasis}}checked{{end}}> Pre/de-emphasis</label>
+      </div>
+      <div class="field" style="flex:none">
+        <label><input type="checkbox" name="high_pass" value="1" {{if and $last $last.HighPassFilter}}checked{{end}}> High pass filter</label>
+      </div>
+      <div class="field" style="flex:none">
+        <label><input type="checkbox" name="low_pass" value="1" {{if and $last $last.LowPassFilter}}checked{{end}}> Low pass filter</label>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary" onclick="return confirm('Send these settings to the radio module now? This transmits AT commands directly over serial to reprogram it.')">Send to radio module</button>
+    </div>
+  </form>
+  {{if $last}}
+  <div class="hint" style="margin-top:1rem">
+    Last sent {{$last.AppliedAt.Format "2006-01-02 15:04:05"}} — {{if $last.Success}}accepted{{else}}rejected{{end}} by the module.
+  </div>
+  <pre style="max-height:220px; overflow:auto; font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem; white-space:pre-wrap; margin-top:0.5rem;">{{$last.Output}}</pre>
+  {{end}}
+</div>
+
 <div class="card">
   <h2>Restart options</h2>
   <div class="row">

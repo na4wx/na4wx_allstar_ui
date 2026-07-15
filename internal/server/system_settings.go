@@ -7,6 +7,7 @@ import (
 
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/netconfig"
+	"hamvoipconfiggui/internal/sa818"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -33,6 +34,8 @@ type systemPageData struct {
 	LogError        string
 	NetError        string
 	RadioDevices    []radioDeviceRef
+	SA818Tool       string
+	SA818Last       *sa818.LastApplied
 }
 
 func (s *Server) handleSystemPage(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +81,13 @@ func (s *Server) renderSystemPage(w http.ResponseWriter, r *http.Request, pd pag
 	}
 
 	data.RadioDevices = s.listAllRadioDevices()
+
+	data.SA818Tool = s.sa818Tool
+	if s.sa818StatePath != "" {
+		if last, err := sa818.LoadLast(s.sa818StatePath); err == nil {
+			data.SA818Last = last
+		}
+	}
 
 	s.render(w, "system.html", data)
 }
