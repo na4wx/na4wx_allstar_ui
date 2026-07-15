@@ -76,7 +76,7 @@ func (s *Server) populateConnectionsSelection(r *http.Request, data *connections
 		data.MacroDefs = defs
 	}
 
-	if out, err := system.AsteriskRX(r.Context(), "rpt nodes "+number); err != nil {
+	if out, err := system.AsteriskRX(r.Context(), s.asteriskBin, "rpt nodes "+number); err != nil {
 		data.LinkStatusErr = err.Error()
 	} else {
 		data.LinkStatus = out
@@ -219,7 +219,7 @@ func (s *Server) handleConnectionsSendDTMF(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	out, err := system.AsteriskRX(r.Context(), "rpt fun "+number+" "+digits)
+	out, err := system.AsteriskRX(r.Context(), s.asteriskBin, "rpt fun "+number+" "+digits)
 	if err != nil {
 		data.pageData = flash("error", err.Error())
 	} else {

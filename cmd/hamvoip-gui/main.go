@@ -22,7 +22,7 @@ func main() {
 	addr := flag.String("addr", ":8088", "listen address")
 	asteriskEtc := flag.String("asterisk-etc", "/etc/asterisk", "path to Asterisk's config directory")
 	authFile := flag.String("auth-file", "/etc/hamvoip-gui/auth.json", "path to store admin credentials")
-	asteriskService := flag.String("asterisk-service", "asterisk", "systemd unit name Asterisk runs under (varies by distro — check with 'systemctl list-units | grep -i aster' if the default doesn't work)")
+	asteriskBin := flag.String("asterisk-bin", "asterisk", "path to the asterisk binary, or bare name if it's on PATH (some distros install it somewhere non-standard, e.g. HamVoIP's /usr/local/hamvoip-asterisk/sbin/asterisk); used for status checks, restarts, and the Connections page — Asterisk's own CLI is used rather than systemd, since it's frequently supervised some other way (e.g. a safe_asterisk watchdog script)")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -47,7 +47,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskService)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

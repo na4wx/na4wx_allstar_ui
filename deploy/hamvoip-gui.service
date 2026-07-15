@@ -1,16 +1,17 @@
 [Unit]
 Description=HamVoIP Config GUI
-# "asterisk.service" is a guess — it varies by distro/image. If
-# `systemctl list-units | grep -i aster` on this node shows a different
-# unit name, update it here AND pass the same name via -asterisk-service
-# below (that flag controls what the Restart Asterisk button and the
-# dashboard's running/stopped status actually check).
-After=network.target asterisk.service
-Wants=asterisk.service
+# Asterisk on HamVoIP is supervised by safe_asterisk, not a native
+# systemd unit — there's nothing named "asterisk.service" to order
+# against or depend on, so this only waits on the network.
+After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk -asterisk-service asterisk
+# -asterisk-bin points at HamVoIP's actual install path rather than a
+# bare "asterisk" — it isn't on this image's PATH. If yours differs,
+# check with: ls -l /usr/local/hamvoip-asterisk/sbin/asterisk (or
+# wherever `ps aux | grep asterisk` shows it actually running from).
+ExecStart=/usr/local/bin/hamvoip-gui -addr :8088 -asterisk-etc /etc/asterisk -asterisk-bin /usr/local/hamvoip-asterisk/sbin/asterisk
 Restart=on-failure
 RestartSec=2
 # The GUI edits Asterisk config and calls asterisk -rx / systemctl, so it

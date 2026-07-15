@@ -56,19 +56,21 @@ Visit `http://<pi-ip>:8088/setup` to create the admin account — there is no de
 ## Command-line flags
 
 ```
--addr               listen address (default ":8088")
--asterisk-etc       path to Asterisk's config directory (default "/etc/asterisk")
--auth-file          path to store admin credentials (default "/etc/hamvoip-gui/auth.json")
--asterisk-service   systemd unit name Asterisk runs under (default "asterisk")
+-addr           listen address (default ":8088")
+-asterisk-etc   path to Asterisk's config directory (default "/etc/asterisk")
+-auth-file      path to store admin credentials (default "/etc/hamvoip-gui/auth.json")
+-asterisk-bin   path to the asterisk binary, or bare name if it's on PATH (default "asterisk")
 ```
 
-`-asterisk-service` controls what the dashboard's running/stopped indicator checks and what the System page's "Restart radio software" button restarts. The default (`asterisk`) is a guess — it varies by image. If restarting fails with something like `Unit asterisk.service not found`, find the real name with:
+All Asterisk control (the dashboard's running/stopped indicator, the System page's restart button, and the Connections page's live status/DTMF relay) goes through Asterisk's own CLI (`<bin> -rx "..."`) rather than `systemctl` — Asterisk is frequently supervised some other way (e.g. HamVoIP runs it under a `safe_asterisk` watchdog script, not a native systemd unit), so asking Asterisk itself is the only check that works regardless of how it's actually being run.
+
+`-asterisk-bin` matters because the binary isn't always just `asterisk` on `PATH` — HamVoIP installs it at `/usr/local/hamvoip-asterisk/sbin/asterisk`. Find yours with:
 
 ```sh
-systemctl list-units --type=service | grep -i aster
+ps aux | grep asterisk
 ```
 
-and pass it explicitly (also update `ExecStart` in `deploy/hamvoip-gui.service` to match, then `sudo systemctl daemon-reload && sudo systemctl restart hamvoip-gui`).
+and pass the real path explicitly if it's not on `PATH` (also update `ExecStart` in `deploy/hamvoip-gui.service` to match, then `sudo systemctl daemon-reload && sudo systemctl restart hamvoip-gui`).
 
 ## Testing
 

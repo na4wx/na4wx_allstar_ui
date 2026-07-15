@@ -17,33 +17,51 @@ import (
 	"time"
 )
 
-// AsteriskRX runs `asterisk -rx "<cmd>"` and returns its output. cmd is a
+// AsteriskRX runs `<bin> -rx "<cmd>"` and returns its output. cmd is a
 // single Asterisk CLI command (e.g. "rpt reload", "iax2 show registry").
-func AsteriskRX(ctx context.Context, cmd string) (string, error) {
+// bin is normally "asterisk" (resolved via PATH), but on distributions
+// that install it somewhere non-standard (e.g. HamVoIP's
+// /usr/local/hamvoip-asterisk/sbin/asterisk) it needs to be the full
+// path — see the -asterisk-bin flag.
+func AsteriskRX(ctx context.Context, bin, cmd string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	c := exec.CommandContext(ctx, "asterisk", "-rx", cmd)
+	c := exec.CommandContext(ctx, bin, "-rx", cmd)
 	var out, stderr bytes.Buffer
 	c.Stdout = &out
 	c.Stderr = &stderr
 	if err := c.Run(); err != nil {
-		return "", fmt.Errorf("asterisk -rx %q: %w: %s", cmd, err, stderr.String())
+		return "", fmt.Errorf("%s -rx %q: %w: %s", bin, cmd, err, stderr.String())
 	}
 	return out.String(), nil
 }
 
-// AsteriskRunning reports whether the given systemd unit (Asterisk's
-// service name, which varies between distributions — see the
-// -asterisk-service flag) is active.
-func AsteriskRunning(ctx context.Context, unit string) bool {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "systemctl", "is-active", unit).Output()
-	return err == nil && strings.TrimSpace(string(out)) == "active"
+// AsteriskRunning reports whether Asterisk is up and responding to CLI
+// commands. This deliberately doesn't go through systemd/systemctl:
+// Asterisk is very often supervised some other way (a safe_asterisk
+// watchdog script, a custom init script, etc.) rather than as a native
+// systemd unit, which makes asking Asterisk itself the only check that
+// works regardless of how it's actually being run.
+func AsteriskRunning(ctx context.Context, bin string) bool {
+	_, err := AsteriskRX(ctx, bin, "core show version")
+	return err == nil
 }
 
-// ServiceRestart restarts a systemd unit (e.g. "asterisk").
+// AsteriskRestart restarts Asterisk via its own CLI restart command
+// rather than through systemd, for the same reason as AsteriskRunning:
+// this works regardless of what (if anything) is supervising the
+// process. "restart now" restarts immediately rather than waiting for
+// active channels to clear, matching what an operator clicking a
+// "restart" button in the UI expects to happen.
+func AsteriskRestart(ctx context.Context, bin string) error {
+	_, err := AsteriskRX(ctx, bin, "restart now")
+	return err
+}
+
+// ServiceRestart restarts a systemd unit. Not used for Asterisk itself
+// (see AsteriskRestart) — kept for any other systemd-managed service
+// this tool might need to restart in the future.
 func ServiceRestart(ctx context.Context, unit string) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -253,11 +271,11 @@ type Status struct {
 
 // Snapshot gathers a Status, best-effort: individual command failures are
 // recorded in Error but do not abort the rest of the snapshot.
-func Snapshot(ctx context.Context, asteriskUnit string) Status {
+func Snapshot(ctx context.Context, asteriskBin string) Status {
 	var s Status
 	var errs []string
 
-	s.AsteriskRunning = AsteriskRunning(ctx, asteriskUnit)
+	s.AsteriskRunning = AsteriskRunning(ctx, asteriskBin)
 
 	if up, err := Uptime(ctx); err != nil {
 		errs = append(errs, "uptime: "+err.Error())

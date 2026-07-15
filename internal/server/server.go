@@ -18,21 +18,26 @@ import (
 const sessionCookie = "hamvoip_gui_session"
 
 type Server struct {
-	store        *config.Store
-	auth         *auth.Manager
-	tmpl         map[string]*template.Template
-	mux          *http.ServeMux
-	asteriskUnit string
+	store       *config.Store
+	auth        *auth.Manager
+	tmpl        map[string]*template.Template
+	mux         *http.ServeMux
+	asteriskBin string
 }
 
 // New builds a Server. templatesFS should contain web/templates and
 // staticFS should contain web/static (both typically embed.FS values
-// from main). asteriskUnit is the systemd unit name Asterisk runs
-// under — it varies between distributions, so it's a caller-supplied
-// value rather than a hardcoded "asterisk" (see the -asterisk-service
-// flag in main.go).
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskUnit string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskUnit: asteriskUnit}
+// from main). asteriskBin is the path (or bare name, if it's on PATH)
+// to the asterisk binary — it's not always just "asterisk" (e.g.
+// HamVoIP installs it at /usr/local/hamvoip-asterisk/sbin/asterisk),
+// so it's a caller-supplied value rather than hardcoded — see the
+// -asterisk-bin flag in main.go. All Asterisk control (status, restart,
+// the Connections page's live status/DTMF relay) goes through this
+// binary's own CLI rather than systemd, since Asterisk is very often
+// supervised some other way (e.g. a safe_asterisk watchdog script)
+// rather than as a native systemd unit.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin}
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {
@@ -253,7 +258,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		nodes = append(nodes, node)
 	}
-	status := system.Snapshot(r.Context(), s.asteriskUnit)
+	status := system.Snapshot(r.Context(), s.asteriskBin)
 	s.render(w, "dashboard.html", struct {
 		pageData
 		Nodes  []*config.Node
@@ -264,6 +269,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	status := system.Snapshot(ctx, s.asteriskUnit)
+	status := system.Snapshot(ctx, s.asteriskBin)
 	writeJSON(w, status)
 }
