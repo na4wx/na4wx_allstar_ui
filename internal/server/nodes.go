@@ -67,6 +67,10 @@ type nodesIndexData struct {
 }
 
 func (s *Server) handleNodesIndex(w http.ResponseWriter, r *http.Request) {
+	s.renderNodesIndex(w, r, pageData{LoggedIn: true})
+}
+
+func (s *Server) renderNodesIndex(w http.ResponseWriter, r *http.Request, pd pageData) {
 	numbers, err := s.store.ListNodes()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -79,7 +83,7 @@ func (s *Server) handleNodesIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.render(w, "nodes_index.html", nodesIndexData{
-		pageData: pageData{LoggedIn: true},
+		pageData: pd,
 		Nodes:    nodes,
 	})
 }
@@ -185,6 +189,15 @@ func nodeFromForm(r *http.Request, number string) *config.Node {
 	return n
 }
 
+// extensionsSyncFailedMsg formats the flash shown when a node's rpt.conf
+// save succeeded but syncing its extensions.conf dialplan entries
+// afterward failed — the node itself is fine, this just means the
+// [radio-secure]/[radio-secure-proxy]/[radio-iaxrpt] entries it needs to
+// actually be reachable weren't added and need manual attention.
+func extensionsSyncFailedMsg(err error) string {
+	return "Node saved, but updating extensions.conf's dialplan entries failed: " + err.Error() + " — add them manually via Raw Config (see EnsureNodeExtensions's contexts: radio-secure, radio-secure-proxy, radio-iaxrpt)."
+}
+
 func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
@@ -196,6 +209,14 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 			pageData:     flash("error", err.Error()),
 			Node:         n,
 			IsNew:        true,
+			RadioDevices: s.loadRadioChannelOptions(),
+		})
+		return
+	}
+	if err := s.store.EnsureNodeExtensions(n.Number); err != nil {
+		s.render(w, "node_form.html", nodeFormData{
+			pageData:     flash("error", extensionsSyncFailedMsg(err)),
+			Node:         n,
 			RadioDevices: s.loadRadioChannelOptions(),
 		})
 		return
@@ -221,6 +242,21 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// Idempotent, so this also backfills entries for a node that existed
+	// before this app managed extensions.conf (or that lost them the
+	// same way rpt.conf's own entries were found to disappear) — simply
+	// re-saving an existing node now self-heals this.
+	if err := s.store.EnsureNodeExtensions(number); err != nil {
+		reg, peer := s.loadRegistrationInfo(number)
+		s.render(w, "node_form.html", nodeFormData{
+			pageData:     flash("error", extensionsSyncFailedMsg(err)),
+			Node:         n,
+			Registration: reg,
+			Peer:         peer,
+			RadioDevices: s.loadRadioChannelOptions(),
+		})
+		return
+	}
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
 }
 
@@ -228,6 +264,10 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	if err := s.store.DeleteNode(number); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := s.store.RemoveNodeExtensions(number); err != nil {
+		s.renderNodesIndex(w, r, flash("error", "Node "+number+" deleted, but removing its extensions.conf dialplan entries failed: "+err.Error()+" — remove them manually via Raw Config."))
 		return
 	}
 	http.Redirect(w, r, "/nodes", http.StatusSeeOther)

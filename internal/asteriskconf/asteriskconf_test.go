@@ -198,6 +198,26 @@ key = 1
 	}
 }
 
+func TestDeleteValueRemovesOnlyMatchingLine(t *testing.T) {
+	f, err := Parse(strings.NewReader(`[radio-secure]
+exten => 68536,1,rpt,68536
+exten => 52829,1,rpt,52829
+`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !f.DeleteValue("radio-secure", "exten", "52829,1,rpt,52829") {
+		t.Fatalf("DeleteValue should report true")
+	}
+	all := f.GetAll("radio-secure", "exten")
+	if len(all) != 1 || all[0] != "68536,1,rpt,68536" {
+		t.Fatalf("GetAll(exten) after DeleteValue = %v, want [68536,1,rpt,68536]", all)
+	}
+	if f.DeleteValue("radio-secure", "exten", "52829,1,rpt,52829") {
+		t.Fatalf("second DeleteValue for the same value should report false")
+	}
+}
+
 func TestDeleteSection(t *testing.T) {
 	f, err := Parse(strings.NewReader(rptFixture))
 	if err != nil {

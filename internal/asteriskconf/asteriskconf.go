@@ -387,6 +387,27 @@ func (f *File) Delete(section, key string) bool {
 	return false
 }
 
+// DeleteValue removes the first key/value line within section whose key
+// and value match exactly. Reports whether a line was removed. For keys
+// that legitimately repeat within a section with different values (e.g.
+// extensions.conf's "exten" lines, one per node), this lets callers
+// remove one specific entry rather than Delete's first-key-occurrence
+// behavior, which would remove an arbitrary other node's line instead.
+func (f *File) DeleteValue(section, key, value string) bool {
+	start, end, ok := f.sectionBounds(section)
+	if !ok {
+		return false
+	}
+	for i := start; i < end; i++ {
+		l := f.Lines[i]
+		if l.Kind == KindKeyValue && l.Key == key && l.Value == value {
+			f.Lines = append(f.Lines[:i], f.Lines[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
 // EnsureSection creates section (with no body) if it does not already
 // exist, appending it to the end of the file.
 func (f *File) EnsureSection(name string) {
