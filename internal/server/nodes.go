@@ -293,14 +293,34 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
 }
 
+// handleNodeDelete removes number's rpt.conf entry plus everything else
+// this app knows how to attach to a node — its extensions.conf dialplan
+// entries and its iax.conf registration/peer stanza — so deleting a
+// node doesn't leave it still trying to register with AllStarLink
+// (found the hard way: a node deleted before this cleanup existed kept
+// showing up "Rejected" in iax2 show registry indefinitely, since
+// nothing had ever removed its orphaned register => line). Each cleanup
+// step is attempted even if an earlier one fails, and any failures are
+// reported together rather than stopping partway through.
 func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	if err := s.store.DeleteNode(number); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	var failed []string
 	if err := s.store.RemoveNodeExtensions(number); err != nil {
-		s.renderNodesIndex(w, r, flash("error", "Node "+number+" deleted, but removing its extensions.conf dialplan entries failed: "+err.Error()+" — remove them manually via Raw Config."))
+		failed = append(failed, "extensions.conf dialplan entries: "+err.Error())
+	}
+	if err := s.store.DeleteRegistration(number); err != nil {
+		failed = append(failed, "iax.conf registration: "+err.Error())
+	}
+	if err := s.store.DeletePeer(number); err != nil {
+		failed = append(failed, "iax.conf peer stanza: "+err.Error())
+	}
+	if len(failed) > 0 {
+		s.renderNodesIndex(w, r, flash("error", "Node "+number+" deleted, but some related config wasn't fully cleaned up: "+strings.Join(failed, "; ")+" — check manually via Raw Config."))
 		return
 	}
 	http.Redirect(w, r, "/nodes", http.StatusSeeOther)

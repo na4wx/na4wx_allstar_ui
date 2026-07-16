@@ -214,3 +214,16 @@ func (s *Store) SavePeer(p *Peer) error {
 	}
 	return s.save(IaxConfFile, f)
 }
+
+// DeletePeer removes the [<node>] friend/peer stanza from iax.conf
+// entirely, if present. A no-op if the node has no peer stanza.
+func (s *Store) DeletePeer(node string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, err := s.load(IaxConfFile)
+	if err != nil {
+		return err
+	}
+	f.DeleteSection(node)
+	return s.save(IaxConfFile, f)
+}

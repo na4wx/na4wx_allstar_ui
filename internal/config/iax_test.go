@@ -187,6 +187,33 @@ func TestSavePeerCreatesNew(t *testing.T) {
 	}
 }
 
+func TestDeletePeer(t *testing.T) {
+	s := newIaxTestStore(t)
+	if err := s.DeletePeer("2000"); err != nil {
+		t.Fatalf("DeletePeer: %v", err)
+	}
+	p, err := s.LoadPeer("2000")
+	if err != nil {
+		t.Fatalf("LoadPeer: %v", err)
+	}
+	if p != nil {
+		t.Fatalf("expected nil peer after delete, got %+v", p)
+	}
+	// The registration line (a different construct, in [general]) must
+	// survive — DeletePeer only removes the node's own [<node>] section.
+	regs, _ := s.ListRegistrations()
+	if len(regs) != 1 {
+		t.Fatalf("registration should survive peer deletion, got %v", regs)
+	}
+}
+
+func TestDeletePeerNoOpWhenMissing(t *testing.T) {
+	s := newIaxTestStore(t)
+	if err := s.DeletePeer("9999"); err != nil {
+		t.Fatalf("DeletePeer of nonexistent node should not error: %v", err)
+	}
+}
+
 func TestSavePeerUpdatesAndClearsFields(t *testing.T) {
 	s := newIaxTestStore(t)
 	p, err := s.LoadPeer("2000")
