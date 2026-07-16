@@ -15,6 +15,12 @@ type nodeFormData struct {
 	Registration *config.Registration
 	Peer         *config.Peer
 	RadioDevices []radioChannelOption
+
+	// OtherNodes lists every other configured node number, offered as
+	// sources to copy a working functions/macro/telemetry/morse set
+	// from — see CloneNodeConfig. Empty if this is the only node (or
+	// the first one being created), since there'd be nothing to copy.
+	OtherNodes []string
 }
 
 // radioChannelOption is one entry in the RX/TX channel dropdown: a
@@ -61,6 +67,24 @@ func (s *Server) loadRadioChannelOptions() []radioChannelOption {
 		}
 	}
 	return opts
+}
+
+// loadOtherNodeNumbers lists every configured node except exclude, for
+// the "copy command/tone set from" picker. Best-effort: an error just
+// means an empty list (the picker simply won't offer anything), not a
+// page failure.
+func (s *Server) loadOtherNodeNumbers(exclude string) []string {
+	numbers, err := s.store.ListNodes()
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, n := range numbers {
+		if n != exclude {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 type nodesIndexData struct {
@@ -127,6 +151,7 @@ func (s *Server) handleNodeNewForm(w http.ResponseWriter, r *http.Request) {
 		Node:         &config.Node{},
 		IsNew:        true,
 		RadioDevices: s.loadRadioChannelOptions(),
+		OtherNodes:   s.loadOtherNodeNumbers(""),
 	})
 }
 
@@ -144,6 +169,7 @@ func (s *Server) handleNodeEditForm(w http.ResponseWriter, r *http.Request) {
 		Registration: reg,
 		Peer:         peer,
 		RadioDevices: s.loadRadioChannelOptions(),
+		OtherNodes:   s.loadOtherNodeNumbers(number),
 	})
 }
 
@@ -190,6 +216,7 @@ func (s *Server) handleNodeRegistrationSave(w http.ResponseWriter, r *http.Reque
 			Registration: regPtr,
 			Peer:         peerPtr,
 			RadioDevices: s.loadRadioChannelOptions(),
+			OtherNodes:   s.loadOtherNodeNumbers(number),
 		})
 		return
 	}
@@ -237,12 +264,14 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n := nodeFromForm(r, "")
+	copyFrom := strings.TrimSpace(r.FormValue("copy_from"))
 	if err := s.store.SaveNode(n); err != nil {
 		s.render(w, "node_form.html", nodeFormData{
 			pageData:     flash("error", err.Error()),
 			Node:         n,
 			IsNew:        true,
 			RadioDevices: s.loadRadioChannelOptions(),
+			OtherNodes:   s.loadOtherNodeNumbers(""),
 		})
 		return
 	}
@@ -254,7 +283,67 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	// Best-effort: the node itself is already fully saved at this point,
+	// so a clone failure shouldn't block getting to the (now real) node
+	// — just surface it clearly rather than silently leaving the new
+	// node with no working command set.
+	if copyFrom != "" {
+		if err := s.store.CloneNodeConfig(copyFrom, n.Number); err != nil {
+			reg, peer := s.loadRegistrationInfo(n.Number)
+			s.render(w, "node_form.html", nodeFormData{
+				pageData:     flash("error", "Node created, but copying the command/tone set from "+copyFrom+" failed: "+err.Error()+" — use the same option on this node's edit page to retry."),
+				Node:         n,
+				Registration: reg,
+				Peer:         peer,
+				RadioDevices: s.loadRadioChannelOptions(),
+				OtherNodes:   s.loadOtherNodeNumbers(n.Number),
+			})
+			return
+		}
+	}
 	http.Redirect(w, r, "/nodes/"+n.Number, http.StatusSeeOther)
+}
+
+// handleNodeCloneConfig is the "repair" counterpart to handleNodeCreate's
+// copy_from option: lets an existing node — including one created
+// before this app knew how to give a new node a working command set —
+// get one in a single click, by copying another node's functions/macro/
+// telemetry/morse sections. See config.Store.CloneNodeConfig.
+func (s *Server) handleNodeCloneConfig(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	node, err := s.store.LoadNode(number)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	from := strings.TrimSpace(r.FormValue("from"))
+	if from == "" {
+		s.render(w, "node_form.html", nodeFormData{
+			pageData:     flash("error", "Pick a node to copy from"),
+			Node:         node,
+			RadioDevices: s.loadRadioChannelOptions(),
+			OtherNodes:   s.loadOtherNodeNumbers(number),
+		})
+		return
+	}
+
+	if err := s.store.CloneNodeConfig(from, number); err != nil {
+		reg, peer := s.loadRegistrationInfo(number)
+		s.render(w, "node_form.html", nodeFormData{
+			pageData:     flash("error", err.Error()),
+			Node:         node,
+			Registration: reg,
+			Peer:         peer,
+			RadioDevices: s.loadRadioChannelOptions(),
+			OtherNodes:   s.loadOtherNodeNumbers(number),
+		})
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
 }
 
 func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
@@ -272,6 +361,7 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 			Registration: reg,
 			Peer:         peer,
 			RadioDevices: s.loadRadioChannelOptions(),
+			OtherNodes:   s.loadOtherNodeNumbers(number),
 		})
 		return
 	}
@@ -287,6 +377,7 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 			Registration: reg,
 			Peer:         peer,
 			RadioDevices: s.loadRadioChannelOptions(),
+			OtherNodes:   s.loadOtherNodeNumbers(number),
 		})
 		return
 	}

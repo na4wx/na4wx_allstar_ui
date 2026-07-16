@@ -154,6 +154,84 @@ func (s *Store) SaveNode(n *Node) error {
 	return s.save(RptConfFile, f)
 }
 
+// companionSections lists the four per-node auxiliary section types a
+// real HamVoIP node needs to actually do anything: functions is its
+// DTMF command map (what makes *3<node> etc. work at all), macro its
+// saved multi-step sequences, telemetry its courtesy tones, morse its
+// CW ID sound set. defaultName is the bare section name app_rpt itself
+// falls back to using when a node's own field is left blank — matching
+// that exactly matters, since a node whose field is blank is silently
+// relying on that section existing, not on having no command set.
+var companionSections = []struct {
+	nodeKey     string
+	defaultName string
+}{
+	{"functions", "functions"},
+	{"macro", "macro"},
+	{"telemetry", "telemetry"},
+	{"morse", "morse"},
+}
+
+// CloneNodeConfig gives dstNumber its own working copy of srcNumber's
+// functions/macro/telemetry/morse sections — new sections named e.g.
+// "functions"+dstNumber, containing the same entries as whatever
+// srcNumber currently uses — and points dstNumber's own fields at them.
+//
+// This exists because this app's node creation only ever wrote a node's
+// identity stanza (rxchannel, duplex, timing), never a working command
+// set: a newly created node's functions/macro/telemetry/morse fields
+// are blank, which makes app_rpt fall back to looking for plain
+// "functions"/"macro"/"telemetry"/"morse" sections that don't exist on
+// a real HamVoIP install (only the number-suffixed ones from whichever
+// node node-config.sh originally set up do) — so the new node silently
+// accepts no DTMF commands at all. Cloning a working node's sections is
+// the fix, both for giving a brand new node a complete set at creation
+// time and for repairing an existing node that was created before this
+// existed.
+//
+// Safe to call more than once: each destination section is rebuilt from
+// scratch from the source's current content, so re-running it after
+// editing the source re-syncs the clone rather than duplicating entries.
+func (s *Store) CloneNodeConfig(srcNumber, dstNumber string) error {
+	if srcNumber == "" || dstNumber == "" {
+		return fmt.Errorf("config: source and destination node numbers are required")
+	}
+	if srcNumber == dstNumber {
+		return fmt.Errorf("config: source and destination nodes must be different")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, err := s.load(RptConfFile)
+	if err != nil {
+		return err
+	}
+	if !f.HasSection(srcNumber) {
+		return fmt.Errorf("config: source node %s not found in %s", srcNumber, RptConfFile)
+	}
+	if !f.HasSection(dstNumber) {
+		return fmt.Errorf("config: destination node %s not found in %s", dstNumber, RptConfFile)
+	}
+
+	for _, cs := range companionSections {
+		srcSection, _ := f.Get(srcNumber, cs.nodeKey)
+		if srcSection == "" {
+			srcSection = cs.defaultName
+		}
+		dstSection := cs.defaultName + dstNumber
+
+		if f.HasSection(srcSection) {
+			for _, kv := range f.SectionKeys(srcSection) {
+				f.Set(dstSection, kv.Key, kv.Value)
+			}
+		} else {
+			f.EnsureSection(dstSection)
+		}
+		f.Set(dstNumber, cs.nodeKey, dstSection)
+	}
+
+	return s.save(RptConfFile, f)
+}
+
 // DeleteNode removes a node's [nodes] entry and its per-node section
 // entirely.
 func (s *Store) DeleteNode(number string) error {

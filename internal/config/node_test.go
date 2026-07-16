@@ -211,6 +211,117 @@ func TestSaveNodeRejectsNonNumericNumber(t *testing.T) {
 	}
 }
 
+// cloneFixture mirrors the real scenario this was built for: node 68536
+// has a complete, working functions/macro/telemetry/morse set (all
+// explicitly named with its own number, HamVoIP's own convention), while
+// node 52829 has none of those fields set at all — a node added through
+// this app before it knew how to give a new node a working command set.
+const cloneFixture = `[functions68536]
+1=ilink,1
+3=ilink,3
+
+[macro68536]
+1=*81 *80#
+
+[telemetry68536]
+ct1=|t(350,0,100,2048)
+remotemon=|t(1209,0,50,2048)
+
+[morse68536]
+speed=20
+frequency=800
+
+[nodes]
+
+[68536]
+rxchannel = SimpleUSB/usb
+duplex = 4
+functions = functions68536
+macro = macro68536
+telemetry = telemetry68536
+morse = morse68536
+
+[52829]
+rxchannel = SimpleUSB/Device
+duplex = 4
+`
+
+func newCloneTestStore(t *testing.T) *Store {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, RptConfFile), []byte(cloneFixture), 0644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	return NewStore(dir)
+}
+
+func TestCloneNodeConfigGivesDestinationAWorkingSet(t *testing.T) {
+	s := newCloneTestStore(t)
+	if err := s.CloneNodeConfig("68536", "52829"); err != nil {
+		t.Fatalf("CloneNodeConfig: %v", err)
+	}
+
+	dst, err := s.LoadNode("52829")
+	if err != nil {
+		t.Fatalf("LoadNode(52829): %v", err)
+	}
+	if dst.Functions != "functions52829" || dst.Macro != "macro52829" ||
+		dst.Telemetry != "telemetry52829" || dst.Morse != "morse52829" {
+		t.Fatalf("52829 companion fields = %+v, want all *52829", dst)
+	}
+
+	raw, _ := os.ReadFile(filepath.Join(s.dir, RptConfFile))
+	out := string(raw)
+	for _, want := range []string{
+		"[functions52829]\n1 = ilink,1\n3 = ilink,3",
+		"[macro52829]\n1 = *81 *80#",
+		"[telemetry52829]\nct1 = |t(350,0,100,2048)\nremotemon = |t(1209,0,50,2048)",
+		"[morse52829]\nspeed = 20\nfrequency = 800",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+
+	// Source node's own sections and fields must be untouched.
+	if !strings.Contains(out, "[functions68536]\n1=ilink,1\n3=ilink,3") {
+		t.Fatalf("source functions68536 disturbed:\n%s", out)
+	}
+}
+
+func TestCloneNodeConfigIsResyncable(t *testing.T) {
+	s := newCloneTestStore(t)
+	if err := s.CloneNodeConfig("68536", "52829"); err != nil {
+		t.Fatalf("first CloneNodeConfig: %v", err)
+	}
+	if err := s.CloneNodeConfig("68536", "52829"); err != nil {
+		t.Fatalf("second CloneNodeConfig: %v", err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(s.dir, RptConfFile))
+	if strings.Count(string(raw), "[functions52829]") != 1 {
+		t.Fatalf("CloneNodeConfig duplicated the destination section:\n%s", raw)
+	}
+	// The clone always renders "key = value" (spaces), distinct from the
+	// source's untouched "key=value" — so this only counts entries
+	// within the destination section, confirming it wasn't duplicated.
+	if strings.Count(string(raw), "1 = ilink,1") != 1 {
+		t.Fatalf("re-running CloneNodeConfig duplicated entries:\n%s", raw)
+	}
+}
+
+func TestCloneNodeConfigRejectsUnknownNodes(t *testing.T) {
+	s := newCloneTestStore(t)
+	if err := s.CloneNodeConfig("99999", "52829"); err == nil {
+		t.Fatalf("expected error for unknown source node")
+	}
+	if err := s.CloneNodeConfig("68536", "99999"); err == nil {
+		t.Fatalf("expected error for unknown destination node")
+	}
+	if err := s.CloneNodeConfig("68536", "68536"); err == nil {
+		t.Fatalf("expected error when source and destination are the same")
+	}
+}
+
 func TestDeleteNode(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.DeleteNode("2000"); err != nil {

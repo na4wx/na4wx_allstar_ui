@@ -101,6 +101,19 @@
 
   <div class="card">
     <h2>Sounds &amp; announcements</h2>
+    {{if and .IsNew .OtherNodes}}
+    <div class="field">
+      <div class="label-row">
+        <label for="copy_from">Copy command/tone set from</label>
+        {{template "help" "A node needs its own working set of touch-tone commands, courtesy tones, and Morse ID sounds to do anything — without one, DTMF commands like connecting to another node silently do nothing. Copying from a node you already have working gives this one the same complete set immediately. Strongly recommended unless you know you want to build a custom set from scratch."}}
+      </div>
+      <select id="copy_from" name="copy_from">
+        <option value="">Don't copy — leave blank / build custom below</option>
+        {{range .OtherNodes}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+      <div class="hint">Fills in the four fields below automatically — leave them blank if you're copying.</div>
+    </div>
+    {{end}}
     <div class="row">
       <div class="field">
         <div class="label-row">
@@ -151,6 +164,30 @@
 </form>
 
 {{if not .IsNew}}
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Command/tone set</h2>
+    {{template "help" "A node needs its own working set of touch-tone commands, courtesy tones, and Morse ID sounds to do anything — without one, DTMF commands like connecting to another node silently do nothing. This copies another node's complete set to this one in one click, overwriting whatever this node currently has for status tones, Morse, commands, and macros."}}
+  </div>
+  {{if .OtherNodes}}
+  <form method="post" action="/nodes/{{.Node.Number}}/clone-config">
+    <div class="row">
+      <div class="field">
+        <label for="clone_from">Copy from node</label>
+        <select id="clone_from" name="from">
+          {{range .OtherNodes}}<option value="{{.}}">{{.}}</option>{{end}}
+        </select>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:0">
+      <button type="submit" class="primary" onclick="return confirm('Copy the command/tone set from that node to {{.Node.Number}}? This overwrites {{.Node.Number}}\'s current status tones, Morse ID, touch-tone commands, and macros with a copy of the other node\'s.')">Copy command/tone set</button>
+    </div>
+  </form>
+  {{else}}
+  <p class="hint">No other nodes configured yet to copy from.</p>
+  {{end}}
+</div>
+
 <form method="post" action="/nodes/{{.Node.Number}}/registration">
   <div class="card">
     <h2>Connect to the AllStarLink network</h2>

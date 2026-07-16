@@ -97,6 +97,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("GET /nodes/{number}", s.requireAuth(s.handleNodeEditForm))
 	s.mux.HandleFunc("POST /nodes/{number}", s.requireAuth(s.handleNodeSave))
 	s.mux.HandleFunc("POST /nodes/{number}/registration", s.requireAuth(s.handleNodeRegistrationSave))
+	s.mux.HandleFunc("POST /nodes/{number}/clone-config", s.requireAuth(s.handleNodeCloneConfig))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))
