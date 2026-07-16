@@ -21,10 +21,10 @@
     </div>
     <div class="field">
       <div class="label-row">
-        <label for="dial_string">Local connection address</label>
-        {{template "help" "A technical setting the repeater software uses internally to find itself on this device. You normally never need to change this — it's not the same as the internet registration below."}}
+        <label for="dial_string">Local connection address (rarely needed)</label>
+        {{template "help" "For local-LAN-only or private (off of AllStarLink) node setups only. A normal AllStarLink-registered node leaves this blank entirely — it's not the same as, and won't affect, the internet registration below."}}
       </div>
-      <input type="text" id="dial_string" name="dial_string" value="{{.Node.DialString}}" placeholder="radio@127.0.0.1:4569/{{if .Node.Number}}{{.Node.Number}}{{else}}NODE{{end}},NONE">
+      <input type="text" id="dial_string" name="dial_string" value="{{.Node.DialString}}" placeholder="Leave blank unless you know you need this">
     </div>
   </div>
 

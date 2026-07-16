@@ -1,25 +1,41 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 // RptConfFile is the standard HamVoIP app_rpt config file name.
 const RptConfFile = "rpt.conf"
 
-// Node is the identity/registration profile for one AllStar node, backed
-// by rpt.conf's [nodes] entry (the local IAX dial string used by app_rpt
-// to reach the node) and its per-node stanza (the fields well documented
-// in app_rpt's sample rpt.conf). Internet-facing IAX2 registration
-// (iax.conf's "register =>" line, i.e. the credentials that connect this
-// node to the wider AllStarLink network) is edited separately via the
-// generic config editor, since its section layout varies more between
-// HamVoIP releases.
-type Node struct {
-	Number string // e.g. "2000"; the [nodes] key and per-node section name
+// nodeSectionRe matches a node's own rpt.conf section name, e.g. "68536"
+// — always purely numeric, per the node number field's own validation
+// (node_form.html's pattern="[0-9]+"). This is what distinguishes a
+// node's section from the many other sections HamVoIP's node-config.sh
+// generates in the same file (morse68536, controlstates, schedule68536,
+// events68536, functions68536, macro68536, telemetry68536,
+// wait-times68536, nodes, ...) — all of which mix in a word, so none of
+// them collide with this pattern.
+var nodeSectionRe = regexp.MustCompile(`^[0-9]+$`)
 
-	// DialString is the raw value of the [nodes] entry, conventionally
-	// "radio@host:port/node,NONE". Kept as opaque text so unusual
-	// formats round-trip untouched; ParsedHost/ParsedPort are a
-	// best-effort convenience for the UI only.
+// Node is the identity/registration profile for one AllStar node, backed
+// by its own numbered rpt.conf stanza (the fields well documented in
+// app_rpt's sample rpt.conf). Internet-facing IAX2 registration (iax.conf's
+// "register =>" line, i.e. the credentials that connect this node to the
+// wider AllStarLink network) is edited separately via the generic config
+// editor, since its section layout varies more between HamVoIP releases.
+type Node struct {
+	Number string // e.g. "2000"; the per-node section name
+
+	// DialString is the raw value of this node's entry in rpt.conf's
+	// [nodes] section, conventionally "radio@host:port/node,NONE" —
+	// but confirmed, from a real HamVoIP-generated rpt.conf's own
+	// comments, that [nodes] is NOT a master registry every node needs
+	// an entry in: it's documented there as being for local-LAN-only or
+	// private (off of AllStarLink) node aliases specifically, and a
+	// normal AllStarLink-registered node has no entry there at all —
+	// just its own numbered section. So this is usually empty, and
+	// that's normal, not a sign of a broken node.
 	DialString string
 
 	RXChannel   string // e.g. "USBRADIO/usb" or "Voter/125"
@@ -56,8 +72,10 @@ var nodeFields = []struct {
 	{"idrecording", func(n *Node) *string { return &n.IDRecording }},
 }
 
-// ListNodes returns node numbers from rpt.conf's [nodes] section, in
-// file order.
+// ListNodes returns node numbers found in rpt.conf: every section whose
+// name is purely numeric (see nodeSectionRe), in file order. This
+// deliberately does not depend on rpt.conf's [nodes] section having an
+// entry for each node — see the Node.DialString doc comment for why.
 func (s *Store) ListNodes() ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -65,10 +83,11 @@ func (s *Store) ListNodes() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	kv := f.SectionKeys("nodes")
-	out := make([]string, 0, len(kv))
-	for _, p := range kv {
-		out = append(out, p.Key)
+	var out []string
+	for _, sec := range f.Sections() {
+		if nodeSectionRe.MatchString(sec) {
+			out = append(out, sec)
+		}
 	}
 	return out, nil
 }
@@ -96,15 +115,19 @@ func (s *Store) LoadNode(number string) (*Node, error) {
 	return n, nil
 }
 
-// SaveNode writes n back to rpt.conf. If n.Number is not already present
-// in [nodes], both the section and the [nodes] entry are created.
-// Renaming a node (changing Number on an existing node) is not
-// supported here — delete and recreate instead, since it would also
-// require updating every other place the old number is referenced
-// (dialplan, other nodes' link lists, etc.).
+// SaveNode writes n back to rpt.conf. The [nodes] entry is only written
+// when DialString is explicitly set — see the Node.DialString doc
+// comment for why an empty one is normal and should stay absent rather
+// than being defaulted to something. Renaming a node (changing Number
+// on an existing node) is not supported here — delete and recreate
+// instead, since it would also require updating every other place the
+// old number is referenced (dialplan, other nodes' link lists, etc.).
 func (s *Store) SaveNode(n *Node) error {
 	if n.Number == "" {
 		return fmt.Errorf("config: node number is required")
+	}
+	if !nodeSectionRe.MatchString(n.Number) {
+		return fmt.Errorf("config: node number must be numeric")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -113,18 +136,10 @@ func (s *Store) SaveNode(n *Node) error {
 		return err
 	}
 
-	if n.DialString == "" {
-		// Every node needs a [nodes] entry — it's what Asterisk's
-		// dialplan uses to actually invoke the node, not just a display
-		// nicety — so leaving it blank can't mean "skip it" the way an
-		// empty value does for the per-node fields below. This is the
-		// standard local loopback dial string used across HamVoIP/
-		// AllStarLink nodes when nothing more specific is needed, and
-		// matches the form's own placeholder for this field.
-		n.DialString = fmt.Sprintf("radio@127.0.0.1:4569/%s,NONE", n.Number)
+	if n.DialString != "" {
+		f.EnsureSection("nodes")
+		f.Set("nodes", n.Number, n.DialString)
 	}
-	f.EnsureSection("nodes")
-	f.Set("nodes", n.Number, n.DialString)
 
 	f.EnsureSection(n.Number)
 	for _, fld := range nodeFields {
