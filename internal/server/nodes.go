@@ -61,6 +61,29 @@ func (s *Server) loadRadioChannelOptions() []radioChannelOption {
 	return opts
 }
 
+type nodesIndexData struct {
+	pageData
+	Nodes []*config.Node
+}
+
+func (s *Server) handleNodesIndex(w http.ResponseWriter, r *http.Request) {
+	numbers, err := s.store.ListNodes()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var nodes []*config.Node
+	for _, n := range numbers {
+		if node, err := s.store.LoadNode(n); err == nil {
+			nodes = append(nodes, node)
+		}
+	}
+	s.render(w, "nodes_index.html", nodesIndexData{
+		pageData: pageData{LoggedIn: true},
+		Nodes:    nodes,
+	})
+}
+
 func (s *Server) handleNodeNewForm(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "node_form.html", nodeFormData{
 		pageData:     pageData{LoggedIn: true},

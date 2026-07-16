@@ -59,7 +59,7 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 }
 
 func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
-	pages := []string{"setup.html", "login.html", "dashboard.html", "node_form.html", "config.html", "system.html", "radio_index.html", "radio_form.html", "connections.html"}
+	pages := []string{"setup.html", "login.html", "dashboard.html", "nodes_index.html", "node_form.html", "config.html", "system.html", "radio_index.html", "radio_form.html", "connections.html"}
 	out := map[string]*template.Template{}
 	for _, page := range pages {
 		t, err := template.ParseFS(templatesFS, "layout.html", page)
@@ -85,9 +85,10 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /logout", s.requireAuth(s.handleLogout))
 
 	s.mux.HandleFunc("GET /{$}", s.requireAuth(s.handleDashboard))
+	s.mux.HandleFunc("POST /dashboard/{number}/link", s.requireAuth(s.handleDashboardLink))
 	s.mux.HandleFunc("GET /api/status", s.requireAuth(s.handleAPIStatus))
 
-	s.mux.HandleFunc("GET /nodes", s.requireAuth(s.handleDashboard))
+	s.mux.HandleFunc("GET /nodes", s.requireAuth(s.handleNodesIndex))
 	s.mux.HandleFunc("GET /nodes/new", s.requireAuth(s.handleNodeNewForm))
 	s.mux.HandleFunc("POST /nodes", s.requireAuth(s.handleNodeCreate))
 	s.mux.HandleFunc("GET /nodes/{number}", s.requireAuth(s.handleNodeEditForm))
@@ -255,27 +256,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	numbers, err := s.store.ListNodes()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	var nodes []*config.Node
-	for _, n := range numbers {
-		node, err := s.store.LoadNode(n)
-		if err != nil {
-			continue // skip malformed entries rather than failing the whole page
-		}
-		nodes = append(nodes, node)
-	}
-	status := system.Snapshot(r.Context(), s.asteriskBin)
-	s.render(w, "dashboard.html", struct {
-		pageData
-		Nodes  []*config.Node
-		Status system.Status
-	}{pageData{LoggedIn: true}, nodes, status})
-}
 
 func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)

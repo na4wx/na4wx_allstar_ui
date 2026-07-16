@@ -1,0 +1,26 @@
+{{define "title"}}Nodes{{end}}
+{{define "content"}}
+<h1>Nodes</h1>
+<div class="card">
+  {{if .Nodes}}
+  <table>
+    <thead><tr><th>Node</th><th>RX channel</th><th></th></tr></thead>
+    <tbody>
+      {{range .Nodes}}
+      <tr>
+        <td>{{.Number}}</td>
+        <td>{{.RXChannel}}</td>
+        <td><a class="btn" href="/nodes/{{.Number}}">Edit</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No nodes configured yet.</p>
+  {{end}}
+  <div class="actions">
+    <a class="btn primary" href="/nodes/new">Add node</a>
+  </div>
+</div>
+{{end}}
+{{template "layout" .}}

@@ -22,27 +22,56 @@
   </div>
 </div>
 
+{{if .Quick}}
+{{range .Quick}}
 <div class="card">
-  <h2>Nodes</h2>
-  {{if .Nodes}}
-  <table>
-    <thead><tr><th>Node</th><th>RX channel</th><th></th></tr></thead>
-    <tbody>
-      {{range .Nodes}}
-      <tr>
-        <td>{{.Number}}</td>
-        <td>{{.RXChannel}}</td>
-        <td><a class="btn" href="/nodes/{{.Number}}">Edit</a></td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-  {{else}}
-  <p class="hint">No nodes configured yet.</p>
-  {{end}}
-  <div class="actions">
-    <a class="btn primary" href="/nodes/new">Add node</a>
+  <div class="label-row">
+    <h2 style="margin:0">Node {{.Node.Number}} — quick actions</h2>
+    {{template "help" "A live glance at this node plus one-click link/unlink. For the full command list, saved macros, and touch-tone sender, use the Connections page."}}
   </div>
+  <div class="row">
+    <div class="field">
+      <div class="label-row">
+        <label>Connected nodes</label>
+        {{template "help" "Other stations currently linked to this node — the raw output of app_rpt's own rpt nodes command."}}
+      </div>
+      {{if .ConnectedErr}}
+      <p class="hint">Could not read: {{.ConnectedErr}}</p>
+      {{else}}
+      <pre style="font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem; white-space:pre-wrap; max-height:180px; overflow:auto; margin:0;">{{if .Connected}}{{.Connected}}{{else}}(none){{end}}</pre>
+      {{end}}
+    </div>
+    <div class="field">
+      <div class="label-row">
+        <label>Link activity</label>
+        {{template "help" "The raw output of app_rpt's rpt lstats command — connection stats and, depending on your app_rpt version, which links are currently keyed. Shown unmodified since exact columns vary by version; this app doesn't try to reinterpret it."}}
+      </div>
+      {{if .ActivityErr}}
+      <p class="hint">Could not read: {{.ActivityErr}}</p>
+      {{else}}
+      <pre style="font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem; white-space:pre-wrap; max-height:180px; overflow:auto; margin:0;">{{if .Activity}}{{.Activity}}{{else}}(none){{end}}</pre>
+      {{end}}
+    </div>
+  </div>
+  <form method="post" action="/dashboard/{{.Node.Number}}/link" onsubmit="return confirm('Send this link/unlink command to node {{.Node.Number}} now?')">
+    <div class="row">
+      <div class="field">
+        <label for="quick_target_{{.Node.Number}}">Other node's number</label>
+        <input type="text" id="quick_target_{{.Node.Number}}" name="target" placeholder="2000" required>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:0">
+      <button type="submit" name="action" value="link" class="primary">Link</button>
+      <button type="submit" name="action" value="unlink">Unlink</button>
+      <a class="btn" href="/connections?node={{.Node.Number}}">Full connections page</a>
+    </div>
+  </form>
 </div>
+{{end}}
+{{else}}
+<div class="card">
+  <p class="hint">No nodes configured yet — add one on the <a href="/nodes">Nodes page</a> first.</p>
+</div>
+{{end}}
 {{end}}
 {{template "layout" .}}
