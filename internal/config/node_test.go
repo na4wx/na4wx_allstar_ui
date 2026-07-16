@@ -125,6 +125,44 @@ func TestSaveNodeCreatesNew(t *testing.T) {
 	}
 }
 
+func TestSaveNodeDefaultsBlankDialString(t *testing.T) {
+	// Regression test: a node saved with no dial string used to be
+	// silently left out of [nodes] entirely, making it invisible to
+	// ListNodes (and, since [nodes] is what the dialplan actually uses
+	// to invoke a node, likely non-functional in Asterisk too) despite
+	// its own [<number>] section existing.
+	s := newTestStore(t)
+	n := &Node{Number: "4000", RXChannel: "USBRADIO/usb2"}
+	if err := s.SaveNode(n); err != nil {
+		t.Fatalf("SaveNode: %v", err)
+	}
+	if n.DialString == "" {
+		t.Fatalf("SaveNode should have filled in n.DialString")
+	}
+
+	nodes, err := s.ListNodes()
+	if err != nil {
+		t.Fatalf("ListNodes: %v", err)
+	}
+	found := false
+	for _, num := range nodes {
+		if num == "4000" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("ListNodes = %v, want it to include 4000", nodes)
+	}
+
+	n2, err := s.LoadNode("4000")
+	if err != nil {
+		t.Fatalf("LoadNode 4000: %v", err)
+	}
+	if n2.DialString == "" {
+		t.Fatalf("LoadNode 4000 DialString is still empty on disk")
+	}
+}
+
 func TestDeleteNode(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.DeleteNode("2000"); err != nil {

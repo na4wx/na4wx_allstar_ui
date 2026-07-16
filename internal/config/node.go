@@ -113,10 +113,18 @@ func (s *Store) SaveNode(n *Node) error {
 		return err
 	}
 
-	f.EnsureSection("nodes")
-	if n.DialString != "" {
-		f.Set("nodes", n.Number, n.DialString)
+	if n.DialString == "" {
+		// Every node needs a [nodes] entry — it's what Asterisk's
+		// dialplan uses to actually invoke the node, not just a display
+		// nicety — so leaving it blank can't mean "skip it" the way an
+		// empty value does for the per-node fields below. This is the
+		// standard local loopback dial string used across HamVoIP/
+		// AllStarLink nodes when nothing more specific is needed, and
+		// matches the form's own placeholder for this field.
+		n.DialString = fmt.Sprintf("radio@127.0.0.1:4569/%s,NONE", n.Number)
 	}
+	f.EnsureSection("nodes")
+	f.Set("nodes", n.Number, n.DialString)
 
 	f.EnsureSection(n.Number)
 	for _, fld := range nodeFields {
