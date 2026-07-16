@@ -2,6 +2,8 @@ package server
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"hamvoipconfiggui/internal/config"
 )
@@ -86,6 +88,37 @@ func (s *Server) renderNodesIndex(w http.ResponseWriter, r *http.Request, pd pag
 		pageData: pd,
 		Nodes:    nodes,
 	})
+}
+
+// handleNodesSyncExtensions is the bulk counterpart to the per-node
+// EnsureNodeExtensions call in handleNodeCreate/handleNodeSave: it
+// backfills every configured node's extensions.conf dialplan entries in
+// one pass, for nodes that already existed (or lost their entries the
+// same way rpt.conf's own did) before this app started managing that
+// file, without requiring an individual visit-and-resave per node.
+// EnsureNodeExtensions only ever adds missing entries, never touches
+// existing ones, so this is safe to run repeatedly.
+func (s *Server) handleNodesSyncExtensions(w http.ResponseWriter, r *http.Request) {
+	numbers, err := s.store.ListNodes()
+	if err != nil {
+		s.renderNodesIndex(w, r, flash("error", err.Error()))
+		return
+	}
+
+	var failed []string
+	for _, number := range numbers {
+		if err := s.store.EnsureNodeExtensions(number); err != nil {
+			failed = append(failed, number+": "+err.Error())
+		}
+	}
+
+	ok := len(numbers) - len(failed)
+	msg := "Synced dialplan entries for " + strconv.Itoa(ok) + " of " + strconv.Itoa(len(numbers)) + " node(s)."
+	if len(failed) > 0 {
+		s.renderNodesIndex(w, r, flash("error", msg+" Failed: "+strings.Join(failed, "; ")))
+		return
+	}
+	s.renderNodesIndex(w, r, flash("ok", msg))
 }
 
 func (s *Server) handleNodeNewForm(w http.ResponseWriter, r *http.Request) {

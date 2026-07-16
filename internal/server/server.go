@@ -91,6 +91,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("GET /api/status", s.requireAuth(s.handleAPIStatus))
 
 	s.mux.HandleFunc("GET /nodes", s.requireAuth(s.handleNodesIndex))
+	s.mux.HandleFunc("POST /nodes/sync-extensions", s.requireAuth(s.handleNodesSyncExtensions))
 	s.mux.HandleFunc("GET /nodes/new", s.requireAuth(s.handleNodeNewForm))
 	s.mux.HandleFunc("POST /nodes", s.requireAuth(s.handleNodeCreate))
 	s.mux.HandleFunc("GET /nodes/{number}", s.requireAuth(s.handleNodeEditForm))

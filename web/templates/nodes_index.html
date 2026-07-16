@@ -20,6 +20,12 @@
   {{end}}
   <div class="actions">
     <a class="btn primary" href="/nodes/new">Add node</a>
+    {{if .Nodes}}
+    <form method="post" action="/nodes/sync-extensions" style="display:inline">
+      <button type="submit" class="btn">Sync dialplan entries for all nodes</button>
+    </form>
+    {{template "help" "Backfills each node's extensions.conf entries (radio-secure, radio-secure-proxy, radio-iaxrpt) if any are missing — the dialplan routing that makes a node actually reachable, separate from its rpt.conf settings. Only adds what's missing; never touches or duplicates existing entries, so it's safe to run any time."}}
+    {{end}}
   </div>
 </div>
 {{end}}
