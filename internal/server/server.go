@@ -87,6 +87,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("GET /{$}", s.requireAuth(s.handleDashboard))
 	s.mux.HandleFunc("POST /dashboard/{number}/link", s.requireAuth(s.handleDashboardLink))
 	s.mux.HandleFunc("POST /dashboard/{number}/recreate-device", s.requireAuth(s.handleDashboardRecreateDevice))
+	s.mux.HandleFunc("POST /dashboard/radio/{file}/placeholder", s.requireAuth(s.handleDashboardAddPlaceholderDevice))
 	s.mux.HandleFunc("GET /api/status", s.requireAuth(s.handleAPIStatus))
 
 	s.mux.HandleFunc("GET /nodes", s.requireAuth(s.handleNodesIndex))

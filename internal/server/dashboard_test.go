@@ -31,3 +31,17 @@ func TestParseRadioChannel(t *testing.T) {
 		}
 	}
 }
+
+func TestPlaceholderRadioDeviceIsUsableByChanSimpleusb(t *testing.T) {
+	// These specific fields are what's needed for chan_simpleusb/
+	// chan_usbradio to accept the device as its "active" one and finish
+	// loading — confirmed against a real HamVoIP node that was failing
+	// to start until a device with at least these fields existed.
+	d := placeholderRadioDevice("usb")
+	if d.Name != "usb" {
+		t.Fatalf("Name = %q, want usb", d.Name)
+	}
+	if d.CarrierFrom == "" || d.TXPrelim == "" || d.RXMixerSet == "" || d.TXMixerSet == "" {
+		t.Fatalf("placeholderRadioDevice(usb) = %+v, want no empty required fields", d)
+	}
+}

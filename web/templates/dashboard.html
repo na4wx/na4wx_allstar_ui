@@ -22,6 +22,20 @@
   </div>
 </div>
 
+{{range .EmptyRadioFiles}}
+<div class="card" style="border-color:var(--danger)">
+  <div class="label-row">
+    <h2 style="margin:0; color:var(--danger)">{{.}} has no devices — this can block Asterisk from starting</h2>
+    {{template "help" "Found the hard way: this HamVoIP build treats any loaded channel driver having no findable device as fatal to the whole Asterisk process, even if no configured node actually uses that driver. An empty usbradio.conf or simpleusb.conf can bring down a node that only uses the other one."}}
+  </div>
+  <form method="post" action="/dashboard/radio/{{.}}/placeholder" onsubmit="return confirm('Add a placeholder device to {{.}}? Nothing will actually use it — this only exists so its channel driver can load.')">
+    <div class="actions" style="margin-top:0">
+      <button type="submit" class="primary">Add placeholder device &amp; try to bring Asterisk up</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
 {{if .Quick}}
 {{range .Quick}}
 {{if .MissingDevice}}
