@@ -1,6 +1,6 @@
-{{define "title"}}{{if .IsNew}}Add node{{else}}Node {{.Node.Number}}{{end}}{{end}}
+{{define "title"}}Node {{.Node.Number}}{{end}}
 {{define "content"}}
-<h1>{{if .IsNew}}Add node{{else}}Node {{.Node.Number}}{{end}}</h1>
+<h1>Node {{.Node.Number}}</h1>
 
 <datalist id="radio_channel_options">
   {{range .RadioDevices}}<option value="{{.Channel}}">{{.Label}}</option>{{end}}
@@ -29,7 +29,7 @@
   <option value="autopatchdn">autopatchdn — end the autopatch call</option>
 </datalist>
 
-<form method="post" action="{{if .IsNew}}/nodes{{else}}/nodes/{{.Node.Number}}{{end}}">
+<form method="post" action="/nodes/{{.Node.Number}}">
   <div class="card">
     <h2>Node identity</h2>
     <div class="row">
@@ -38,8 +38,8 @@
           <label for="number">Node number</label>
           {{template "help" "The unique number assigned to your node when you registered at allstarlink.org, e.g. 546051."}}
         </div>
-        <input type="text" id="number" name="number" value="{{.Node.Number}}" {{if not .IsNew}}readonly{{end}} required pattern="[0-9]+">
-        {{if not .IsNew}}<div class="hint">Node numbers can't be changed here — delete and recreate the node instead.</div>{{end}}
+        <input type="text" id="number" name="number" value="{{.Node.Number}}" readonly required pattern="[0-9]+">
+        <div class="hint">Node numbers can't be changed here — delete and recreate the node instead.</div>
       </div>
     </div>
     <div class="field">
@@ -168,16 +168,6 @@
       <h2 style="margin:0">Command/tone set</h2>
       {{template "help" "A node needs its own working set of touch-tone commands, courtesy tones, and Morse ID sounds to do anything — without one, DTMF commands like connecting to another node silently do nothing. This is the single most common reason a newly added node doesn't work."}}
     </div>
-    {{if .IsNew}}
-    <div class="field">
-      <label for="copy_from">Give this node a working command/tone set</label>
-      <select id="copy_from" name="copy_from">
-        <option value="__standard__" selected>Use the standard AllStarLink command set (recommended)</option>
-        {{range .OtherNodes}}<option value="{{.}}">Copy from node {{.}}</option>{{end}}
-        <option value="">Don't set one up — build a custom set from scratch (advanced)</option>
-      </select>
-    </div>
-    {{else}}
     <div class="field">
       <label for="clone_from">Replace this node's command/tone set</label>
       <div class="row" style="align-items:flex-end; margin-top:0.4rem">
@@ -192,7 +182,6 @@
         </div>
       </div>
     </div>
-    {{end}}
 
     <details style="margin-top:1rem">
       <summary style="cursor:pointer; color:var(--text-dim); font-size:0.9rem;">Advanced: set section names manually</summary>
@@ -240,20 +229,15 @@
   <div class="actions">
     <button type="submit" class="primary">Save</button>
     <a class="btn" href="/">Cancel</a>
-    {{if not .IsNew}}
     <span style="flex:1"></span>
     <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; color:var(--text-dim);">
       <input type="checkbox" name="delete_device" value="1" form="delete_node_form"> also delete its radio device (only if unused elsewhere)
     </label>
     <button type="submit" form="delete_node_form" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This cannot be undone.')">Delete node</button>
-    {{end}}
   </div>
 </form>
-{{if not .IsNew}}
 <form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
-{{end}}
 
-{{if not .IsNew}}
 <form method="post" action="/nodes/{{.Node.Number}}/registration">
   <div class="card">
     <h2>Connect to the AllStarLink network</h2>
@@ -509,6 +493,5 @@
     </tbody>
   </table>
 </div>
-{{end}}
 {{end}}
 {{template "layout" .}}

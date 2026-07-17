@@ -59,7 +59,7 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 }
 
 func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
-	pages := []string{"setup.html", "login.html", "home.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
+	pages := []string{"setup.html", "login.html", "home.html", "node_new.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
 	out := map[string]*template.Template{}
 	for _, page := range pages {
 		// radio_device_fields.html is a shared partial ({{template

@@ -14,16 +14,16 @@ import (
 // Offered alongside real node numbers in the same picker.
 const standardCommandSetSentinel = "__standard__"
 
-// nodeFormData backs the single consolidated node page: identity,
-// radio hardware (pick an existing device or create one inline),
-// timing, command/tone set, AllStarLink registration, and (once the
-// node exists) its live connection status and DTMF/macro management —
-// everything that used to be split across the Nodes, Radio, and
-// Connections pages.
+// nodeFormData backs the consolidated node edit page: identity, radio
+// hardware (pick an existing device or create one inline), timing,
+// command/tone set, AllStarLink registration, and live connection
+// status and DTMF/macro management — everything that used to be split
+// across the Nodes, Radio, and Connections pages. This is edit-only;
+// a brand new node is created via the separate minimal setup wizard
+// (node_new.go / node_new.html), which redirects here once done.
 type nodeFormData struct {
 	pageData
-	Node  *config.Node
-	IsNew bool
+	Node *config.Node
 
 	Registration *config.Registration
 	Peer         *config.Peer
@@ -125,11 +125,10 @@ func (s *Server) loadOtherNodeNumbers(exclude string) []string {
 // device picker options, a blank in-progress device (for the "create
 // new" sub-form's starting state), detected sound cards, CTCSS tone
 // suggestions, and the list of other nodes to copy a command set from.
-func (s *Server) newNodeFormData(n *config.Node, isNew bool) nodeFormData {
+func (s *Server) newNodeFormData(n *config.Node) nodeFormData {
 	cards, _ := system.ListSoundCards()
 	return nodeFormData{
 		Node:          n,
-		IsNew:         isNew,
 		RadioMode:     "existing",
 		RadioDevices:  s.loadRadioChannelOptions(),
 		Device:        &config.RadioDevice{},
@@ -158,16 +157,10 @@ func (s *Server) renderNodeEditPage(w http.ResponseWriter, r *http.Request, numb
 // reloading from disk, so a validation error doesn't discard everything
 // the operator typed.
 func (s *Server) renderNodeEditPageWithNode(w http.ResponseWriter, r *http.Request, n *config.Node, pd pageData) {
-	data := s.newNodeFormData(n, false)
+	data := s.newNodeFormData(n)
 	data.Registration, data.Peer = s.loadRegistrationInfo(n.Number)
 	data.pageData = pd
 	s.populateNodeLiveStatus(r, &data)
-	s.render(w, "node_form.html", data)
-}
-
-func (s *Server) handleNodeNewForm(w http.ResponseWriter, r *http.Request) {
-	data := s.newNodeFormData(&config.Node{}, true)
-	data.pageData = pageData{LoggedIn: true}
 	s.render(w, "node_form.html", data)
 }
 
@@ -243,56 +236,6 @@ func (s *Server) applyInlineRadioDevice(r *http.Request, n *config.Node) (device
 	return d, "", true
 }
 
-func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
-		return
-	}
-	n := nodeFromForm(r, "")
-	copyFrom := strings.TrimSpace(r.FormValue("copy_from"))
-
-	device, errMsg, attempted := s.applyInlineRadioDevice(r, n)
-	if attempted && errMsg != "" {
-		data := s.newNodeFormData(n, true)
-		data.pageData = flash("error", errMsg)
-		data.RadioMode = "new"
-		data.Device = device
-		s.render(w, "node_form.html", data)
-		return
-	}
-
-	if err := s.store.SaveNode(n); err != nil {
-		data := s.newNodeFormData(n, true)
-		data.pageData = flash("error", err.Error())
-		s.render(w, "node_form.html", data)
-		return
-	}
-	if err := s.store.EnsureNodeExtensions(n.Number); err != nil {
-		data := s.newNodeFormData(n, true)
-		data.pageData = flash("error", extensionsSyncFailedMsg(err))
-		s.render(w, "node_form.html", data)
-		return
-	}
-
-	// Best-effort from here: the node itself is already fully saved, so
-	// a command-set failure shouldn't block getting to the (now real)
-	// node — just surface it clearly rather than silently leaving it
-	// with no working command set.
-	switch {
-	case copyFrom == standardCommandSetSentinel:
-		if err := s.store.ApplyStandardCommandSet(n.Number); err != nil {
-			s.renderNodeEditPage(w, r, n.Number, flash("error", "Node created, but applying the standard command set failed: "+err.Error()+" — retry from the Command/tone set section below."))
-			return
-		}
-	case copyFrom != "":
-		if err := s.store.CloneNodeConfig(copyFrom, n.Number); err != nil {
-			s.renderNodeEditPage(w, r, n.Number, flash("error", "Node created, but copying the command/tone set from "+copyFrom+" failed: "+err.Error()+" — retry from the Command/tone set section below."))
-			return
-		}
-	}
-	http.Redirect(w, r, "/nodes/"+n.Number, http.StatusSeeOther)
-}
-
 func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	if err := r.ParseForm(); err != nil {
@@ -307,7 +250,7 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 		// renderNodeEditPageWithNode, so the in-progress "new device"
 		// fields the operator actually typed (device) are shown back
 		// instead of a blank sub-form.
-		data := s.newNodeFormData(n, false)
+		data := s.newNodeFormData(n)
 		data.Registration, data.Peer = s.loadRegistrationInfo(number)
 		data.pageData = flash("error", errMsg)
 		data.RadioMode = "new"
