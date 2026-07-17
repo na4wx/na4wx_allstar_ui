@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"hamvoipconfiggui/internal/config"
-	"hamvoipconfiggui/internal/system"
 )
 
 var radioFiles = []string{config.UsbradioConfFile, config.SimpleusbConfFile}
@@ -22,6 +21,12 @@ type radioDeviceRef struct {
 	File  string
 	Name  string
 	Label string
+
+	// UsedByNode is the node number currently referencing this device
+	// (via rxchannel or txchannel), or "" if no configured node does —
+	// populated by radioDeviceUsage in system_settings.go, left blank by
+	// listAllRadioDevices itself.
+	UsedByNode string
 }
 
 // listAllRadioDevices returns every configured device across both
@@ -41,20 +46,6 @@ func (s *Server) listAllRadioDevices() []radioDeviceRef {
 	return refs
 }
 
-// defaultRadioFile picks which of usbradio.conf/simpleusb.conf to show
-// when the user hasn't picked one explicitly: whichever one actually
-// has devices configured, falling back to usbradio.conf (the more
-// common driver) if neither does or if detection fails.
-func (s *Server) defaultRadioFile() string {
-	if devices, err := s.store.ListRadioDevices(config.UsbradioConfFile); err == nil && len(devices) > 0 {
-		return config.UsbradioConfFile
-	}
-	if devices, err := s.store.ListRadioDevices(config.SimpleusbConfFile); err == nil && len(devices) > 0 {
-		return config.SimpleusbConfFile
-	}
-	return config.UsbradioConfFile
-}
-
 // standardCTCSSTones is the standard EIA set of sub-audible tone
 // frequencies (Hz) used across ham and land-mobile radio, offered as
 // suggestions on the transmit tone field — not an exhaustive validation
@@ -68,84 +59,16 @@ var standardCTCSSTones = []string{
 	"241.8", "245.5", "250.3", "254.1",
 }
 
-type radioIndexData struct {
-	pageData
-	Files   []string
-	File    string
-	Devices []string
-}
-
-// handleRadioIndex lists devices for one radio file. If the file isn't
-// specified via ?file=, defaults to whichever of usbradio.conf/
-// simpleusb.conf actually has devices in it — a node only ever uses
-// one of the two, so this avoids landing on a blank page just because
-// it happened to be the other one.
-func (s *Server) handleRadioIndex(w http.ResponseWriter, r *http.Request) {
-	file := r.URL.Query().Get("file")
-	if !isRadioFileParam(file) {
-		file = s.defaultRadioFile()
-	}
-	devices, err := s.store.ListRadioDevices(file)
-	if err != nil {
-		s.render(w, "radio_index.html", radioIndexData{
-			pageData: flash("error", err.Error()),
-			Files:    radioFiles,
-			File:     file,
-		})
-		return
-	}
-	s.render(w, "radio_index.html", radioIndexData{
-		pageData: pageData{LoggedIn: true},
-		Files:    radioFiles,
-		File:     file,
-		Devices:  devices,
-	})
-}
-
+// radioFormData backs the System page's radio device editor — the only
+// remaining way to adjust an already-created device's settings (audio
+// levels, signal detection, etc.) after the fact. Creating a brand new
+// device only happens inline from a node's own page now (see
+// applyInlineRadioDevice in nodes.go); this page is edit/delete only.
 type radioFormData struct {
 	pageData
-	File          string
-	Device        *config.RadioDevice
-	IsNew         bool
-	DetectedCards []system.SoundCard
-	CTCSSTones    []string
-}
-
-func (s *Server) handleRadioNewForm(w http.ResponseWriter, r *http.Request) {
-	file := r.PathValue("file")
-	if !isRadioFileParam(file) {
-		http.NotFound(w, r)
-		return
-	}
-	cards, _ := system.ListSoundCards()
-	s.render(w, "radio_form.html", radioFormData{
-		pageData:      pageData{LoggedIn: true},
-		File:          file,
-		Device:        &config.RadioDevice{},
-		IsNew:         true,
-		DetectedCards: cards,
-		CTCSSTones:    standardCTCSSTones,
-	})
-}
-
-func (s *Server) handleRadioEditForm(w http.ResponseWriter, r *http.Request) {
-	file := r.PathValue("file")
-	name := r.PathValue("name")
-	if !isRadioFileParam(file) {
-		http.NotFound(w, r)
-		return
-	}
-	d, err := s.store.LoadRadioDevice(file, name)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	s.render(w, "radio_form.html", radioFormData{
-		pageData:   pageData{LoggedIn: true},
-		File:       file,
-		Device:     d,
-		CTCSSTones: standardCTCSSTones,
-	})
+	File       string
+	Device     *config.RadioDevice
+	CTCSSTones []string
 }
 
 func radioDeviceFromForm(r *http.Request, name string) *config.RadioDevice {
@@ -174,30 +97,24 @@ func radioDeviceFromForm(r *http.Request, name string) *config.RadioDevice {
 	return d
 }
 
-func (s *Server) handleRadioCreate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRadioEditForm(w http.ResponseWriter, r *http.Request) {
 	file := r.PathValue("file")
+	name := r.PathValue("name")
 	if !isRadioFileParam(file) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+	d, err := s.store.LoadRadioDevice(file, name)
+	if err != nil {
+		http.NotFound(w, r)
 		return
 	}
-	d := radioDeviceFromForm(r, "")
-	if err := s.store.SaveRadioDevice(file, d); err != nil {
-		cards, _ := system.ListSoundCards()
-		s.render(w, "radio_form.html", radioFormData{
-			pageData:      flash("error", err.Error()),
-			File:          file,
-			Device:        d,
-			IsNew:         true,
-			DetectedCards: cards,
-			CTCSSTones:    standardCTCSSTones,
-		})
-		return
-	}
-	http.Redirect(w, r, "/radio/"+file+"/"+d.Name, http.StatusSeeOther)
+	s.render(w, "radio_form.html", radioFormData{
+		pageData:   pageData{LoggedIn: true},
+		File:       file,
+		Device:     d,
+		CTCSSTones: standardCTCSSTones,
+	})
 }
 
 func (s *Server) handleRadioSave(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +138,7 @@ func (s *Server) handleRadioSave(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	http.Redirect(w, r, "/radio/"+file+"/"+name, http.StatusSeeOther)
+	s.renderSystemPage(w, r, flash("ok", "Saved device "+name+" ("+file+")."))
 }
 
 func (s *Server) handleRadioDelete(w http.ResponseWriter, r *http.Request) {
@@ -235,5 +152,5 @@ func (s *Server) handleRadioDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/radio?file="+file, http.StatusSeeOther)
+	s.renderSystemPage(w, r, flash("ok", "Deleted device "+name+" ("+file+")."))
 }

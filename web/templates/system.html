@@ -98,10 +98,55 @@
   </form>
 </div>
 
+{{range .EmptyRadioFiles}}
+<div class="card" style="border-color:var(--danger)">
+  <div class="label-row">
+    <h2 style="margin:0; color:var(--danger)">{{.}} has no devices — this can block Asterisk from starting</h2>
+    {{template "help" "Found the hard way: this HamVoIP build treats any loaded channel driver having no findable device as fatal to the whole Asterisk process, even if no configured node actually uses that driver. An empty usbradio.conf or simpleusb.conf can bring down a node that only uses the other one."}}
+  </div>
+  <form method="post" action="/system/radio/{{.}}/placeholder" onsubmit="return confirm('Add a placeholder device to {{.}}? Nothing will actually use it — this only exists so its channel driver can load.')">
+    <div class="actions" style="margin-top:0">
+      <button type="submit" class="primary">Add placeholder device &amp; try to bring Asterisk up</button>
+    </div>
+  </form>
+</div>
+{{end}}
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Radio devices</h2>
+    {{template "help" "Every USB sound-fob device configured across usbradio.conf and simpleusb.conf. Devices are created inline from a node's own page (Radio hardware section) — this is for adjusting an existing one's settings, or removing one that's no longer used."}}
+  </div>
+  {{if .RadioDevices}}
+  <table>
+    <thead><tr><th>Device</th><th>File</th><th>Used by</th><th></th></tr></thead>
+    <tbody>
+      {{range .RadioDevices}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>{{.File}}</td>
+        <td>{{if .UsedByNode}}node {{.UsedByNode}}{{else}}<span class="hint">not currently used</span>{{end}}</td>
+        <td>
+          <a class="btn" href="/system/radio/{{.File}}/{{.Name}}">Edit</a>
+          {{if not .UsedByNode}}
+          <form method="post" action="/system/radio/{{.File}}/{{.Name}}/delete" style="display:inline" onsubmit="return confirm('Delete device {{.Name}} from {{.File}}? This cannot be undone.')">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+          {{end}}
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No radio devices set up yet — add one from a node's page (Radio hardware section).</p>
+  {{end}}
+</div>
+
 <div class="card">
   <div class="label-row">
     <h2 style="margin:0">SHARI USB quick setup</h2>
-    {{template "help" "One-click fill for the USB audio settings a SHARI USB interface needs, sourced from the SHARI setup documentation. This only covers the USB sound codec side (carrier detection, pre/de-emphasis, PL filter). It does not set the radio module's frequency, CTCSS tone, or squelch — those are programmed separately over a serial connection to the SA818 module, which isn't handled here yet."}}
+    {{template "help" "One-click fill for the USB audio settings a SHARI USB interface needs, sourced from the SHARI setup documentation. This only covers the USB sound codec side (carrier detection, pre/de-emphasis, PL filter). It does not set the radio module's frequency, CTCSS tone, or squelch — those are programmed separately over a serial connection to the SA818 module, see the section below."}}
   </div>
   {{if .RadioDevices}}
   <form method="post" action="/system/sharipi/apply">
@@ -120,7 +165,7 @@
     </div>
   </form>
   {{else}}
-  <p class="hint">No radio devices set up yet — add one on the <a href="/radio">Radio page</a> first, then come back here to apply the SHARI USB preset to it.</p>
+  <p class="hint">No radio devices set up yet — add one from a node's page first, then come back here to apply the SHARI USB preset to it.</p>
   {{end}}
 </div>
 

@@ -36,6 +36,15 @@ type systemPageData struct {
 	RadioDevices    []radioDeviceRef
 	SA818Tool       string
 	SA818Last       *sa818.LastApplied
+
+	// EmptyRadioFiles lists usbradio.conf/simpleusb.conf files with zero
+	// devices defined at all, regardless of whether any node actually
+	// uses that driver. Found the hard way: this HamVoIP/Asterisk 1.4
+	// build treats ANY loaded channel driver having no findable "active
+	// device" as fatal to the whole process — even chan_usbradio failing
+	// that check killed startup on a node that only uses SimpleUSB and
+	// never references USBRADIO at all.
+	EmptyRadioFiles []string
 }
 
 func (s *Server) handleSystemPage(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +89,15 @@ func (s *Server) renderSystemPage(w http.ResponseWriter, r *http.Request, pd pag
 		data.LogLines = lines
 	}
 
-	data.RadioDevices = s.listAllRadioDevices()
+	data.RadioDevices = s.radioDeviceUsage()
+
+	var emptyFiles []string
+	for _, file := range radioFiles {
+		if devices, err := s.store.ListRadioDevices(file); err == nil && len(devices) == 0 {
+			emptyFiles = append(emptyFiles, file)
+		}
+	}
+	data.EmptyRadioFiles = emptyFiles
 
 	data.SA818Tool = s.sa818Tool
 	if s.sa818StatePath != "" {
@@ -162,6 +179,82 @@ func (s *Server) handleSystemNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderSystemPage(w, r, flash("ok", "Network configuration saved. Reboot to apply it — this does not take effect until then."))
+}
+
+// radioDeviceUsage lists every configured device across both driver
+// files, annotated with which node (if any) currently references it —
+// for the System page's device list, so an orphaned device (one no
+// node points at) is visible and distinguishable from one in active
+// use before deleting or repurposing it.
+func (s *Server) radioDeviceUsage() []radioDeviceRef {
+	refs := s.listAllRadioDevices()
+	numbers, err := s.store.ListNodes()
+	if err != nil {
+		return refs
+	}
+	usedBy := map[radioChannelRef]string{}
+	for _, num := range numbers {
+		node, err := s.store.LoadNode(num)
+		if err != nil {
+			continue
+		}
+		for _, ch := range []string{node.RXChannel, node.TXChannel} {
+			if ref, ok := parseRadioChannel(ch); ok {
+				usedBy[ref] = num
+			}
+		}
+	}
+	for i := range refs {
+		if node, ok := usedBy[radioChannelRef{File: refs[i].File, Name: refs[i].Name}]; ok {
+			refs[i].UsedByNode = node
+		}
+	}
+	return refs
+}
+
+// placeholderRadioDevice returns a generic, safe starting-point device
+// config — not the operator's actual tuned audio levels, which can't be
+// recovered once a stanza is gone. Shared by Home's per-node "missing
+// device" fix (handleNodeRecreateDevice, dashboard.go) and the
+// file-level "no device at all" fix below, so both create an
+// identically-shaped placeholder.
+func placeholderRadioDevice(name string) *config.RadioDevice {
+	return &config.RadioDevice{
+		Name:        name,
+		CarrierFrom: "usb",
+		TXPrelim:    "yes",
+		RXMixerSet:  "500",
+		TXMixerSet:  "500",
+	}
+}
+
+// handleSystemAddPlaceholderDevice is the file-level counterpart to
+// Home's per-node device-recreate failsafe: usbradio.conf or
+// simpleusb.conf having zero devices at all is fatal to Asterisk
+// startup on this HamVoIP build even when no configured node uses that
+// driver (confirmed the hard way — chan_usbradio failing its "active
+// device" check killed startup on a node that only ever used
+// SimpleUSB). This adds a placeholder device to an otherwise-empty file
+// so that driver's module load succeeds, without implying it does
+// anything useful — nothing will reference it.
+func (s *Server) handleSystemAddPlaceholderDevice(w http.ResponseWriter, r *http.Request) {
+	file := r.PathValue("file")
+	if !isRadioFileParam(file) {
+		http.NotFound(w, r)
+		return
+	}
+	if devices, err := s.store.ListRadioDevices(file); err == nil && len(devices) > 0 {
+		s.renderSystemPage(w, r, flash("ok", file+" already has a device configured — nothing to do"))
+		return
+	}
+
+	if err := s.store.SaveRadioDevice(file, placeholderRadioDevice("usb")); err != nil {
+		s.renderSystemPage(w, r, flash("error", err.Error()))
+		return
+	}
+
+	msg := "Added a placeholder device to " + file + " so its channel driver can load. Nothing actually uses it — this only exists to stop Asterisk aborting startup over an unused driver having no device."
+	s.renderSystemPage(w, r, flash("ok", msg+" "+s.recheckAsteriskMessage(r.Context())))
 }
 
 // handleSystemShariApply applies the documented SHARI USB audio preset

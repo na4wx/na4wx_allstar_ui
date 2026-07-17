@@ -5,6 +5,29 @@
 <datalist id="radio_channel_options">
   {{range .RadioDevices}}<option value="{{.Channel}}">{{.Label}}</option>{{end}}
 </datalist>
+<datalist id="detected_sound_cards">
+  {{range .DetectedCards}}<option value="{{.ID}}">{{.Description}}</option>{{end}}
+</datalist>
+<datalist id="ctcss_tones">
+  {{range .CTCSSTones}}<option value="{{.}}">{{.}} Hz</option>{{end}}
+</datalist>
+<datalist id="tx_audio_sources">
+  <option value="voice">voice — normal repeater/simplex audio</option>
+  <option value="no">no — none</option>
+  <option value="tone">tone — tone only</option>
+  <option value="composite">composite — advanced</option>
+</datalist>
+<datalist id="function_reference">
+  <option value="ilink,1">ilink,1 — disconnect the last-connected node</option>
+  <option value="ilink,2">ilink,2 — connect, listen-only</option>
+  <option value="ilink,3">ilink,3 — connect, both directions, stays connected</option>
+  <option value="ilink,5">ilink,5 — announce connected nodes</option>
+  <option value="ilink,6">ilink,6 — disconnect everything</option>
+  <option value="ilink,8">ilink,8 — connect, listen-only, temporary</option>
+  <option value="status,1">status,1 — announce this node's status</option>
+  <option value="autopatchup">autopatchup — start an autopatch call</option>
+  <option value="autopatchdn">autopatchdn — end the autopatch call</option>
+</datalist>
 
 <form method="post" action="{{if .IsNew}}/nodes{{else}}/nodes/{{.Node.Number}}{{end}}">
   <div class="card">
@@ -30,23 +53,64 @@
 
   <div class="card">
     <h2>Radio hardware</h2>
-    <p class="section-intro">Which physical radio interface this node uses. Set devices up on the <a href="/radio">Radio page</a> first, then pick one here.</p>
+    <p class="section-intro">Which physical radio interface this node uses.</p>
     <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="rxchannel">Radio device</label>
-          {{template "help" "The interface that receives audio from your radio. Click the field to see devices you've already set up on the Radio page."}}
-        </div>
-        <input type="text" id="rxchannel" name="rxchannel" value="{{.Node.RXChannel}}" list="radio_channel_options" placeholder="Click to choose, or type USBRADIO/usb">
+      <div class="field" style="flex:none">
+        <label><input type="radio" name="radio_mode" value="existing" data-radio-mode {{if ne .RadioMode "new"}}checked{{end}}> Use an already-configured device</label>
       </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="txchannel">Transmit device (rarely needed)</label>
-          {{template "help" "Only set this if your transmit audio comes from a different device than receive. The vast majority of setups use one device for both — leave this blank."}}
-        </div>
-        <input type="text" id="txchannel" name="txchannel" value="{{.Node.TXChannel}}" list="radio_channel_options" placeholder="Leave blank unless you know you need this">
+      <div class="field" style="flex:none">
+        <label><input type="radio" name="radio_mode" value="new" data-radio-mode {{if eq .RadioMode "new"}}checked{{end}}> Create a new device</label>
       </div>
     </div>
+
+    <div data-radio-mode-section="existing">
+      <div class="row">
+        <div class="field">
+          <div class="label-row">
+            <label for="rxchannel">Radio device</label>
+            {{template "help" "The interface that receives audio from your radio. Click the field to see devices you've already set up."}}
+          </div>
+          <input type="text" id="rxchannel" name="rxchannel" value="{{.Node.RXChannel}}" list="radio_channel_options" placeholder="Click to choose, or type USBRADIO/usb">
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label for="txchannel">Transmit device (rarely needed)</label>
+            {{template "help" "Only set this if your transmit audio comes from a different device than receive. The vast majority of setups use one device for both — leave this blank."}}
+          </div>
+          <input type="text" id="txchannel" name="txchannel" value="{{.Node.TXChannel}}" list="radio_channel_options" placeholder="Leave blank unless you know you need this">
+        </div>
+      </div>
+      <p class="hint">To adjust an existing device's own settings (audio levels, signal detection, etc.), manage it from the <a href="/system">System page</a>.</p>
+    </div>
+
+    <div data-radio-mode-section="new" style="display:none">
+      <div class="row">
+        <div class="field">
+          <div class="label-row">
+            <label for="device_name">New device name</label>
+            {{template "help" "A label you choose for this device, e.g. usb. It does not need to match your hardware's own ALSA name — confirmed on a real node those can differ with no ill effect."}}
+          </div>
+          <input type="text" id="device_name" name="name" value="{{.Device.Name}}" list="detected_sound_cards" placeholder="e.g. usb — or click for what's plugged in">
+          {{if .DetectedCards}}
+          <div class="hint">Plugged in right now (for reference — the name above doesn't need to match this): {{range $i, $c := .DetectedCards}}{{if $i}}, {{end}}{{.ID}}{{if .Description}} ({{.Description}}){{end}}{{end}}</div>
+          {{else}}
+          <div class="hint">No USB sound devices detected. If you're testing this away from the actual node, that's expected — type the name manually.</div>
+          {{end}}
+        </div>
+        <div class="field">
+          <div class="label-row">
+            <label for="device_file">Driver</label>
+            {{template "help" "Which HamVoIP audio driver this device uses. SimpleUSB is the common choice for USB sound-fob interfaces like SHARI; USBRADIO has a couple of extra hardware-specific options. If you're not sure, SimpleUSB is the safer default."}}
+          </div>
+          <select id="device_file" name="device_file">
+            <option value="simpleusb.conf">SimpleUSB (simpleusb.conf)</option>
+            <option value="usbradio.conf">USBRADIO (usbradio.conf)</option>
+          </select>
+        </div>
+      </div>
+      {{template "radio_device_fields" .Device}}
+    </div>
+
     <div class="row">
       <div class="field">
         <div class="label-row">
@@ -100,51 +164,71 @@
   </div>
 
   <div class="card">
-    <h2>Sounds &amp; announcements</h2>
-    {{if and .IsNew .OtherNodes}}
+    <div class="label-row">
+      <h2 style="margin:0">Command/tone set</h2>
+      {{template "help" "A node needs its own working set of touch-tone commands, courtesy tones, and Morse ID sounds to do anything — without one, DTMF commands like connecting to another node silently do nothing. This is the single most common reason a newly added node doesn't work."}}
+    </div>
+    {{if .IsNew}}
     <div class="field">
-      <div class="label-row">
-        <label for="copy_from">Copy command/tone set from</label>
-        {{template "help" "A node needs its own working set of touch-tone commands, courtesy tones, and Morse ID sounds to do anything — without one, DTMF commands like connecting to another node silently do nothing. Copying from a node you already have working gives this one the same complete set immediately. Strongly recommended unless you know you want to build a custom set from scratch."}}
-      </div>
+      <label for="copy_from">Give this node a working command/tone set</label>
       <select id="copy_from" name="copy_from">
-        <option value="">Don't copy — leave blank / build custom below</option>
-        {{range .OtherNodes}}<option value="{{.}}">{{.}}</option>{{end}}
+        <option value="__standard__" selected>Use the standard AllStarLink command set (recommended)</option>
+        {{range .OtherNodes}}<option value="{{.}}">Copy from node {{.}}</option>{{end}}
+        <option value="">Don't set one up — build a custom set from scratch (advanced)</option>
       </select>
-      <div class="hint">Fills in the four fields below automatically — leave them blank if you're copying.</div>
+    </div>
+    {{else}}
+    <div class="field">
+      <label for="clone_from">Replace this node's command/tone set</label>
+      <div class="row" style="align-items:flex-end; margin-top:0.4rem">
+        <div class="field">
+          <select id="clone_from" name="from">
+            <option value="__standard__">Standard AllStarLink command set</option>
+            {{range .OtherNodes}}<option value="{{.}}">Copy from node {{.}}</option>{{end}}
+          </select>
+        </div>
+        <div class="field" style="flex:none">
+          <button type="submit" formaction="/nodes/{{.Node.Number}}/clone-config" formnovalidate class="btn" onclick="return confirm('Replace node {{.Node.Number}}\'s command/tone set? This overwrites its current status tones, Morse ID, touch-tone commands, and macros.')">Apply</button>
+        </div>
+      </div>
     </div>
     {{end}}
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="telemetry">Status tone set</label>
-          {{template "help" "Which set of beeps/tones the repeater plays for things like connecting or disconnecting. Leave as \"telemetry\" unless you've built a custom sound set."}}
+
+    <details style="margin-top:1rem">
+      <summary style="cursor:pointer; color:var(--text-dim); font-size:0.9rem;">Advanced: set section names manually</summary>
+      <div class="row" style="margin-top:0.75rem">
+        <div class="field">
+          <div class="label-row">
+            <label for="telemetry">Status tone set</label>
+            {{template "help" "Which set of beeps/tones the repeater plays for things like connecting or disconnecting. Leave blank unless you're pointing this at a specific existing section by name."}}
+          </div>
+          <input type="text" id="telemetry" name="telemetry" value="{{.Node.Telemetry}}" placeholder="telemetry">
         </div>
-        <input type="text" id="telemetry" name="telemetry" value="{{.Node.Telemetry}}" placeholder="telemetry">
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="morse">Morse code set</label>
-          {{template "help" "Which Morse code sound set to use for CW identification. Leave as \"morse\" unless customized."}}
+        <div class="field">
+          <div class="label-row">
+            <label for="morse">Morse code set</label>
+            {{template "help" "Which Morse code sound set to use for CW identification. Leave blank unless customized."}}
+          </div>
+          <input type="text" id="morse" name="morse" value="{{.Node.Morse}}" placeholder="morse">
         </div>
-        <input type="text" id="morse" name="morse" value="{{.Node.Morse}}" placeholder="morse">
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="functions">Touch-tone command set</label>
-          {{template "help" "Which set of touch-tone (DTMF) commands this node listens for — things like connecting to another node. Manage the actual commands on the Connections page."}}
+        <div class="field">
+          <div class="label-row">
+            <label for="functions">Touch-tone command set</label>
+            {{template "help" "Which set of touch-tone (DTMF) commands this node listens for. Manage the actual commands further down this page."}}
+          </div>
+          <input type="text" id="functions" name="functions" value="{{.Node.Functions}}" placeholder="functions">
         </div>
-        <input type="text" id="functions" name="functions" value="{{.Node.Functions}}" placeholder="functions">
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="macro">Saved macro set</label>
-          {{template "help" "Which set of saved multi-step command sequences this node uses (triggered by a \"macro\" touch-tone command). Manage the actual macros on the Connections page."}}
+        <div class="field">
+          <div class="label-row">
+            <label for="macro">Saved macro set</label>
+            {{template "help" "Which set of saved multi-step command sequences this node uses. Manage the actual macros further down this page."}}
+          </div>
+          <input type="text" id="macro" name="macro" value="{{.Node.Macro}}" placeholder="macro">
         </div>
-        <input type="text" id="macro" name="macro" value="{{.Node.Macro}}" placeholder="macro">
       </div>
-    </div>
-    <div class="field">
+    </details>
+
+    <div class="field" style="margin-top:1rem">
       <div class="label-row">
         <label for="idrecording">Station ID announcement</label>
         {{template "help" "The voice or Morse recording that identifies your station by callsign — required periodically by FCC rules. Typically a sound file path, or |i followed by your callsign for a built-in voice."}}
@@ -155,39 +239,21 @@
 
   <div class="actions">
     <button type="submit" class="primary">Save</button>
-    <a class="btn" href="/nodes">Cancel</a>
+    <a class="btn" href="/">Cancel</a>
     {{if not .IsNew}}
     <span style="flex:1"></span>
-    <button type="submit" formaction="/nodes/{{.Node.Number}}/delete" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This cannot be undone.')">Delete node</button>
+    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; color:var(--text-dim);">
+      <input type="checkbox" name="delete_device" value="1" form="delete_node_form"> also delete its radio device (only if unused elsewhere)
+    </label>
+    <button type="submit" form="delete_node_form" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This cannot be undone.')">Delete node</button>
     {{end}}
   </div>
 </form>
+{{if not .IsNew}}
+<form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
+{{end}}
 
 {{if not .IsNew}}
-<div class="card">
-  <div class="label-row">
-    <h2 style="margin:0">Command/tone set</h2>
-    {{template "help" "A node needs its own working set of touch-tone commands, courtesy tones, and Morse ID sounds to do anything — without one, DTMF commands like connecting to another node silently do nothing. This copies another node's complete set to this one in one click, overwriting whatever this node currently has for status tones, Morse, commands, and macros."}}
-  </div>
-  {{if .OtherNodes}}
-  <form method="post" action="/nodes/{{.Node.Number}}/clone-config">
-    <div class="row">
-      <div class="field">
-        <label for="clone_from">Copy from node</label>
-        <select id="clone_from" name="from">
-          {{range .OtherNodes}}<option value="{{.}}">{{.}}</option>{{end}}
-        </select>
-      </div>
-    </div>
-    <div class="actions" style="margin-top:0">
-      <button type="submit" class="primary" onclick="return confirm('Copy the command/tone set from that node to {{.Node.Number}}? This overwrites {{.Node.Number}}\'s current status tones, Morse ID, touch-tone commands, and macros with a copy of the other node\'s.')">Copy command/tone set</button>
-    </div>
-  </form>
-  {{else}}
-  <p class="hint">No other nodes configured yet to copy from.</p>
-  {{end}}
-</div>
-
 <form method="post" action="/nodes/{{.Node.Number}}/registration">
   <div class="card">
     <h2>Connect to the AllStarLink network</h2>
@@ -272,6 +338,177 @@
     </div>
   </div>
 </form>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Who's connected right now</h2>
+    {{template "help" "A live snapshot of other stations currently linked to this node."}}
+  </div>
+  {{if .LinkStatusErr}}
+  <p class="hint">Could not read live status: {{.LinkStatusErr}}</p>
+  {{else}}
+  <pre style="font-size:0.8rem; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:0.75rem; white-space:pre-wrap; margin-top:0.75rem;">{{.LinkStatus}}</pre>
+  {{end}}
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Connect or disconnect a node</h2>
+    {{template "help" "Fill in a node number and pick an action — this fills in the touch-tone sequence below, which you then review and send. Nothing happens until you click Send."}}
+  </div>
+  <p class="section-intro">These use AllStarLink's standard touch-tone codes (*3 connect, *2 connect for listening only, *1 disconnect). If the command list below has been customized, use the matching digits from that table instead.</p>
+  <div class="row">
+    <div class="field">
+      <label for="quick_target">Other node's number</label>
+      <input type="text" id="quick_target" data-target-node placeholder="2000">
+    </div>
+  </div>
+  <div class="actions" style="margin-top:0">
+    <button type="button" class="primary" data-fill-digits="*3">Connect (stay connected)</button>
+    <button type="button" data-fill-digits="*2">Connect (listen only)</button>
+    <button type="button" data-fill-digits="*1">Disconnect</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Send a touch-tone command now</h2>
+    {{template "help" "Sends the sequence below exactly as if it were dialed on the radio itself. Using the quick actions above fills this in for you, or you can type any sequence from the command list below."}}
+  </div>
+  <form method="post" action="/nodes/{{.Node.Number}}/dtmf" onsubmit="return confirm('Send this command to node {{.Node.Number}} now? This can connect or disconnect live links.')">
+    <div class="row">
+      <div class="field">
+        <label for="dtmf_digits">Touch-tone sequence</label>
+        <input type="text" id="dtmf_digits" name="digits" data-dtmf-field placeholder="*32000" required>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Send</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Command list ({{.FunctionsSect}})</h2>
+    {{template "help" "Every touch-tone command this node recognizes when dialed from a radio. The same list is used by the quick actions above."}}
+  </div>
+  {{if .Macros}}
+  <table>
+    <thead><tr><th>Digits</th><th>What it does</th><th></th></tr></thead>
+    <tbody>
+      {{range .Macros}}
+      <tr>
+        <td>{{.Digits}}</td>
+        <td>{{.Command}}</td>
+        <td>
+          <form method="post" action="/nodes/{{$.Node.Number}}/macros/{{.Digits}}/delete" style="display:inline" onsubmit="return confirm('Delete command {{.Digits}}?')">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No commands defined yet.</p>
+  {{end}}
+
+  <form method="post" action="/nodes/{{.Node.Number}}/macros" style="margin-top:1rem">
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="macro_digits">Digits to dial</label>
+          {{template "help" "The touch-tone sequence someone dials on their radio to trigger this command."}}
+        </div>
+        <input type="text" id="macro_digits" name="digits" placeholder="1" required>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="macro_command">Command</label>
+          {{template "help" "The underlying app_rpt command that runs — for example ilink,3 connects permanently to whatever node number is dialed next."}}
+        </div>
+        <input type="text" id="macro_command" name="command" list="function_reference" placeholder="ilink,3" required>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Add / update command</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Saved macros ({{.MacroSect}})</h2>
+    {{template "help" "A macro is a saved sequence of touch-tone commands that runs all at once from a single dial — for example, disconnecting one node and connecting another in one step. Triggered with the \"macro\" command in the Command list above (e.g. macro,1 runs the macro saved as \"1\" here)."}}
+  </div>
+  {{if .MacroDefs}}
+  <table>
+    <thead><tr><th>Macro number</th><th>Sequence it runs</th><th></th></tr></thead>
+    <tbody>
+      {{range .MacroDefs}}
+      <tr>
+        <td>{{.Digits}}</td>
+        <td>{{.Command}}</td>
+        <td>
+          <form method="post" action="/nodes/{{$.Node.Number}}/macrodefs/{{.Digits}}/delete" style="display:inline" onsubmit="return confirm('Delete macro {{.Digits}}?')">
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No macros defined yet.</p>
+  {{end}}
+
+  <form method="post" action="/nodes/{{.Node.Number}}/macrodefs" style="margin-top:1rem">
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="macrodef_digits">Macro number</label>
+          {{template "help" "The key used to run this macro — for example, saving this as 1 means the command macro,1 (in the Command list above) will run it."}}
+        </div>
+        <input type="text" id="macrodef_digits" name="digits" placeholder="1" required>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="macrodef_sequence">Sequence to run</label>
+          {{template "help" "The touch-tone sequence this macro plays back, exactly as if you'd dialed each digit yourself — can chain multiple commands together, e.g. *12000*32001 disconnects node 2000 then connects node 2001."}}
+        </div>
+        <input type="text" id="macrodef_sequence" name="sequence" placeholder="*12000*32001" required>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Add / update macro</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Function reference</h2>
+    {{template "help" "The building blocks you can type into the Command field above. Click that field to pick from this list directly."}}
+  </div>
+  <p class="section-intro">This covers the commands most nodes use. app_rpt supports further advanced functions (playing sound files, reading hardware sensors, running saved macros, and more) — check the AllStarLink/app_rpt documentation for anything not listed here, and for the full set of "control operator" (cop) sub-commands, which vary by what your node needs.</p>
+  <table>
+    <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>ilink,1</td><td>Disconnect the most recently connected node</td></tr>
+      <tr><td>ilink,2</td><td>Connect to a node, listen-only — you can hear them, they can't hear you</td></tr>
+      <tr><td>ilink,3</td><td>Connect to a node, both directions — stays connected until manually disconnected</td></tr>
+      <tr><td>ilink,5</td><td>Announce which nodes are currently connected</td></tr>
+      <tr><td>ilink,6</td><td>Disconnect every connected node at once</td></tr>
+      <tr><td>ilink,8</td><td>Connect to a node, listen-only, temporary — drops automatically when the repeater goes idle</td></tr>
+      <tr><td>status,1</td><td>Announce this node's own number and status</td></tr>
+      <tr><td>autopatchup</td><td>Start an autopatch call (dial out through a connected phone line/gateway, if one is set up)</td></tr>
+      <tr><td>autopatchdn</td><td>End the current autopatch call</td></tr>
+      <tr><td>cop,&lt;n&gt;</td><td>"Control operator" — local system actions like reloading configuration. Which number does what depends on your setup; see the documentation.</td></tr>
+      <tr><td>macro,&lt;n&gt;</td><td>Runs a saved sequence of commands in one dial — macros are defined elsewhere in rpt.conf</td></tr>
+    </tbody>
+  </table>
+</div>
 {{end}}
 {{end}}
 {{template "layout" .}}

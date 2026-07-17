@@ -59,10 +59,14 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 }
 
 func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
-	pages := []string{"setup.html", "login.html", "dashboard.html", "nodes_index.html", "node_form.html", "config.html", "system.html", "radio_index.html", "radio_form.html", "connections.html"}
+	pages := []string{"setup.html", "login.html", "home.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
 	out := map[string]*template.Template{}
 	for _, page := range pages {
-		t, err := template.ParseFS(templatesFS, "layout.html", page)
+		// radio_device_fields.html is a shared partial ({{template
+		// "radio_device_fields" ...}}), included for every page since
+		// it's harmless where unused and needed by both node_form.html
+		// and radio_form.html.
+		t, err := template.ParseFS(templatesFS, "layout.html", "radio_device_fields.html", page)
 		if err != nil {
 			return nil, err
 		}
@@ -84,39 +88,32 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /login", s.handleLoginSubmit)
 	s.mux.HandleFunc("POST /logout", s.requireAuth(s.handleLogout))
 
-	s.mux.HandleFunc("GET /{$}", s.requireAuth(s.handleDashboard))
-	s.mux.HandleFunc("POST /dashboard/{number}/link", s.requireAuth(s.handleDashboardLink))
-	s.mux.HandleFunc("POST /dashboard/{number}/recreate-device", s.requireAuth(s.handleDashboardRecreateDevice))
-	s.mux.HandleFunc("POST /dashboard/radio/{file}/placeholder", s.requireAuth(s.handleDashboardAddPlaceholderDevice))
+	s.mux.HandleFunc("GET /{$}", s.requireAuth(s.handleHome))
 	s.mux.HandleFunc("GET /api/status", s.requireAuth(s.handleAPIStatus))
 
-	s.mux.HandleFunc("GET /nodes", s.requireAuth(s.handleNodesIndex))
-	s.mux.HandleFunc("POST /nodes/sync-extensions", s.requireAuth(s.handleNodesSyncExtensions))
+	// Node pages: the one-stop shop for a node's identity, radio
+	// hardware, command/tone set, AllStarLink registration, and live
+	// status/DTMF/macros — everything that used to be split across the
+	// Nodes, Radio, and Connections pages.
 	s.mux.HandleFunc("GET /nodes/new", s.requireAuth(s.handleNodeNewForm))
 	s.mux.HandleFunc("POST /nodes", s.requireAuth(s.handleNodeCreate))
+	s.mux.HandleFunc("POST /nodes/sync-extensions", s.requireAuth(s.handleNodesSyncExtensions))
 	s.mux.HandleFunc("GET /nodes/{number}", s.requireAuth(s.handleNodeEditForm))
 	s.mux.HandleFunc("POST /nodes/{number}", s.requireAuth(s.handleNodeSave))
+	s.mux.HandleFunc("POST /nodes/{number}/link", s.requireAuth(s.handleNodeLink))
+	s.mux.HandleFunc("POST /nodes/{number}/recreate-device", s.requireAuth(s.handleNodeRecreateDevice))
 	s.mux.HandleFunc("POST /nodes/{number}/registration", s.requireAuth(s.handleNodeRegistrationSave))
 	s.mux.HandleFunc("POST /nodes/{number}/clone-config", s.requireAuth(s.handleNodeCloneConfig))
+	s.mux.HandleFunc("POST /nodes/{number}/macros", s.requireAuth(s.handleNodeMacroSave))
+	s.mux.HandleFunc("POST /nodes/{number}/macros/{digits}/delete", s.requireAuth(s.handleNodeMacroDelete))
+	s.mux.HandleFunc("POST /nodes/{number}/macrodefs", s.requireAuth(s.handleNodeMacroDefSave))
+	s.mux.HandleFunc("POST /nodes/{number}/macrodefs/{digits}/delete", s.requireAuth(s.handleNodeMacroDefDelete))
+	s.mux.HandleFunc("POST /nodes/{number}/dtmf", s.requireAuth(s.handleNodeSendDTMF))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))
 	s.mux.HandleFunc("GET /config/{file}", s.requireAuth(s.handleConfigFile))
 	s.mux.HandleFunc("POST /config/{file}", s.requireAuth(s.handleConfigSave))
-
-	s.mux.HandleFunc("GET /radio", s.requireAuth(s.handleRadioIndex))
-	s.mux.HandleFunc("GET /radio/{file}/new", s.requireAuth(s.handleRadioNewForm))
-	s.mux.HandleFunc("POST /radio/{file}", s.requireAuth(s.handleRadioCreate))
-	s.mux.HandleFunc("GET /radio/{file}/{name}", s.requireAuth(s.handleRadioEditForm))
-	s.mux.HandleFunc("POST /radio/{file}/{name}", s.requireAuth(s.handleRadioSave))
-	s.mux.HandleFunc("POST /radio/{file}/{name}/delete", s.requireAuth(s.handleRadioDelete))
-
-	s.mux.HandleFunc("GET /connections", s.requireAuth(s.handleConnectionsIndex))
-	s.mux.HandleFunc("POST /connections/{number}/macros", s.requireAuth(s.handleConnectionsMacroSave))
-	s.mux.HandleFunc("POST /connections/{number}/macros/{digits}/delete", s.requireAuth(s.handleConnectionsMacroDelete))
-	s.mux.HandleFunc("POST /connections/{number}/macrodefs", s.requireAuth(s.handleConnectionsMacroDefSave))
-	s.mux.HandleFunc("POST /connections/{number}/macrodefs/{digits}/delete", s.requireAuth(s.handleConnectionsMacroDefDelete))
-	s.mux.HandleFunc("POST /connections/{number}/dtmf", s.requireAuth(s.handleConnectionsSendDTMF))
 
 	s.mux.HandleFunc("GET /system", s.requireAuth(s.handleSystemPage))
 	s.mux.HandleFunc("POST /system/hostname", s.requireAuth(s.handleSystemHostname))
@@ -126,6 +123,25 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /system/sa818/apply", s.requireAuth(s.handleSystemSA818Apply))
 	s.mux.HandleFunc("POST /system/restart-asterisk", s.requireAuth(s.handleSystemRestartAsterisk))
 	s.mux.HandleFunc("POST /system/reboot", s.requireAuth(s.handleSystemReboot))
+	// Radio device editing (adjusting an already-created device) — device
+	// *creation* only happens inline from a node's own page now.
+	s.mux.HandleFunc("GET /system/radio/{file}/{name}", s.requireAuth(s.handleRadioEditForm))
+	s.mux.HandleFunc("POST /system/radio/{file}/{name}", s.requireAuth(s.handleRadioSave))
+	s.mux.HandleFunc("POST /system/radio/{file}/{name}/delete", s.requireAuth(s.handleRadioDelete))
+	s.mux.HandleFunc("POST /system/radio/{file}/placeholder", s.requireAuth(s.handleSystemAddPlaceholderDevice))
+
+	// Courtesy redirects for old bookmarks — Nodes/Radio/Connections no
+	// longer exist as standalone pages; everything they offered is
+	// reachable from Home, System, or a node's own page now.
+	s.mux.HandleFunc("GET /nodes", s.requireAuth(redirectTo("/")))
+	s.mux.HandleFunc("GET /radio", s.requireAuth(redirectTo("/system")))
+	s.mux.HandleFunc("GET /connections", s.requireAuth(redirectTo("/")))
+}
+
+func redirectTo(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, path, http.StatusSeeOther)
+	}
 }
 
 // pageData is the common template context. Handlers embed it and add

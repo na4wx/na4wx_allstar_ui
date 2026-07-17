@@ -34,6 +34,29 @@
   setInterval(poll, 4000);
 })();
 
+// Node page "radio hardware" toggle: shows either the existing-device
+// picker or the create-a-new-device sub-form depending on which radio
+// button is selected, so both stay in the same form (one POST covers
+// node + optional new device) without cluttering the page with an
+// always-visible device-creation form most edits don't need.
+(function () {
+  const radios = document.querySelectorAll("[data-radio-mode]");
+  if (!radios.length) return;
+  const sections = {
+    existing: document.querySelector('[data-radio-mode-section="existing"]'),
+    new: document.querySelector('[data-radio-mode-section="new"]'),
+  };
+  function apply() {
+    const checked = document.querySelector("[data-radio-mode]:checked");
+    const mode = checked ? checked.value : "existing";
+    for (const key in sections) {
+      if (sections[key]) sections[key].style.display = key === mode ? "" : "none";
+    }
+  }
+  radios.forEach((r) => r.addEventListener("change", apply));
+  apply();
+})();
+
 // Connections page "quick action" buttons: fills the DTMF sequence
 // field with <prefix><target node>, so the operator can review it
 // before sending rather than the click sending anything directly.

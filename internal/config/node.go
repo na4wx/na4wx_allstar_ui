@@ -233,7 +233,11 @@ func (s *Store) CloneNodeConfig(srcNumber, dstNumber string) error {
 }
 
 // DeleteNode removes a node's [nodes] entry and its per-node section
-// entirely.
+// entirely. This does not touch its functions/macro/telemetry/morse
+// companion sections (see CloneNodeConfig) — those might still be
+// referenced by another node, so removing them safely needs a
+// cross-node check only the caller (which can see every node) can make;
+// see the server package's node-delete handler.
 func (s *Store) DeleteNode(number string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -243,5 +247,21 @@ func (s *Store) DeleteNode(number string) error {
 	}
 	f.Delete("nodes", number)
 	f.DeleteSection(number)
+	return s.save(RptConfFile, f)
+}
+
+// DeleteRptSection removes an arbitrary rpt.conf section by name. Used
+// to clean up a deleted node's functions/macro/telemetry/morse
+// companion sections once the caller has confirmed no other node still
+// references them — see CloneNodeConfig/ApplyStandardCommandSet, which
+// create these sections.
+func (s *Store) DeleteRptSection(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, err := s.load(RptConfFile)
+	if err != nil {
+		return err
+	}
+	f.DeleteSection(name)
 	return s.save(RptConfFile, f)
 }

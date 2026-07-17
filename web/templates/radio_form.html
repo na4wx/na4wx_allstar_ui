@@ -1,12 +1,7 @@
-{{define "title"}}{{if .IsNew}}Add radio device{{else}}Device {{.Device.Name}}{{end}}{{end}}
+{{define "title"}}Device {{.Device.Name}}{{end}}
 {{define "content"}}
-<h1>{{if .IsNew}}Add a radio device{{else}}Radio device: {{.Device.Name}}{{end}}</h1>
-
-{{if .IsNew}}
-<datalist id="detected_sound_cards">
-  {{range .DetectedCards}}<option value="{{.ID}}">{{.Description}}</option>{{end}}
-</datalist>
-{{end}}
+<h1>Radio device: {{.Device.Name}}</h1>
+<p class="hint">To create a new device, add or edit a node and choose "create a new device" under Radio hardware — this page is for adjusting an existing one.</p>
 
 <datalist id="ctcss_tones">
   {{range .CTCSSTones}}<option value="{{.}}">{{.}} Hz</option>{{end}}
@@ -19,226 +14,22 @@
   <option value="composite">composite — advanced</option>
 </datalist>
 
-<form method="post" action="{{if .IsNew}}/radio/{{.File}}{{else}}/radio/{{.File}}/{{.Device.Name}}{{end}}">
+<form method="post" action="/system/radio/{{.File}}/{{.Device.Name}}">
   <div class="card">
     <h2>Device</h2>
     <div class="field">
-      <div class="label-row">
-        <label for="name">Device name</label>
-        {{template "help" "A label you choose for this device — it needs to match what your node's rxchannel setting (on the Nodes page) references, e.g. USBRADIO/usb. It does not need to match your hardware's own ALSA name below; on a real node those were confirmed to differ (label \"usb\", hardware name \"Device\") with no ill effect."}}
-      </div>
-      {{if .IsNew}}
-      <input type="text" id="name" name="name" value="{{.Device.Name}}" list="detected_sound_cards" required placeholder="e.g. usb — or click for what's plugged in">
-      {{if .DetectedCards}}
-      <div class="hint">Plugged in right now (for reference — the label above doesn't need to match this): {{range $i, $c := .DetectedCards}}{{if $i}}, {{end}}{{.ID}}{{if .Description}} ({{.Description}}){{end}}{{end}}</div>
-      {{else}}
-      <div class="hint">No USB sound devices detected. If you're testing this away from the actual node, that's expected — type the name manually.</div>
-      {{end}}
-      {{else}}
+      <label for="name">Device name</label>
       <input type="text" id="name" name="name" value="{{.Device.Name}}" readonly>
-      {{end}}
     </div>
   </div>
 
-  <div class="card">
-    <h2>Signal detection</h2>
-    <p class="section-intro">Controls how the interface knows a signal is present and correctly toned, which is what opens the squelch.</p>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="carrierfrom">Detect an incoming signal using</label>
-          {{template "help" "How the interface knows someone is transmitting. If you're not sure, \"USB hardware signal\" is the standard choice for most USB radio interface boards."}}
-        </div>
-        <select id="carrierfrom" name="carrierfrom">
-          <option value="" {{if eq .Device.CarrierFrom ""}}selected{{end}}>(not set)</option>
-          <option value="usb" {{if eq .Device.CarrierFrom "usb"}}selected{{end}}>USB hardware signal (most common)</option>
-          <option value="usbinvert" {{if eq .Device.CarrierFrom "usbinvert"}}selected{{end}}>USB hardware signal, inverted</option>
-          <option value="dsp" {{if eq .Device.CarrierFrom "dsp"}}selected{{end}}>Automatic, from audio (DSP)</option>
-          <option value="vox" {{if eq .Device.CarrierFrom "vox"}}selected{{end}}>Voice-activated (VOX)</option>
-          <option value="no" {{if eq .Device.CarrierFrom "no"}}selected{{end}}>Disabled</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="ctcssfrom">Detect a sub-tone (CTCSS) using</label>
-          {{template "help" "If you use CTCSS/PL tones, this is how the interface confirms the correct tone before opening. Leave disabled if you don't use CTCSS."}}
-        </div>
-        <select id="ctcssfrom" name="ctcssfrom">
-          <option value="" {{if eq .Device.CTCSSFrom ""}}selected{{end}}>(not set)</option>
-          <option value="no" {{if eq .Device.CTCSSFrom "no"}}selected{{end}}>Disabled (no CTCSS)</option>
-          <option value="usb" {{if eq .Device.CTCSSFrom "usb"}}selected{{end}}>USB hardware signal</option>
-          <option value="usbinvert" {{if eq .Device.CTCSSFrom "usbinvert"}}selected{{end}}>USB hardware signal, inverted</option>
-          <option value="dsp" {{if eq .Device.CTCSSFrom "dsp"}}selected{{end}}>Automatic, from audio (DSP)</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="rxdemod">Receive audio type</label>
-          {{template "help" "\"Normal\" matches what you'd hear from the radio's own speaker — right for almost everyone. \"Flat\" is only for advanced setups tapping audio before the radio's own filtering."}}
-        </div>
-        <select id="rxdemod" name="rxdemod">
-          <option value="" {{if eq .Device.RXDemod ""}}selected{{end}}>(not set)</option>
-          <option value="speaker" {{if eq .Device.RXDemod "speaker"}}selected{{end}}>Normal (speaker audio)</option>
-          <option value="flat" {{if eq .Device.RXDemod "flat"}}selected{{end}}>Flat (advanced)</option>
-        </select>
-      </div>
-    </div>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="rxboost">Extra receive gain</label>
-          {{template "help" "Adds additional receive amplification for weak audio. Only turn this on if received audio still sounds too quiet at maximum receive volume below."}}
-        </div>
-        <select id="rxboost" name="rxboost">
-          <option value="" {{if eq .Device.RXBoost ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.RXBoost "0"}}selected{{end}}>Off (normal)</option>
-          <option value="1" {{if eq .Device.RXBoost "1"}}selected{{end}}>On (boost)</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="preemphasis">Pre-emphasis</label>
-          {{template "help" "A transmit audio shaping option some radio interfaces need. Leave at the default unless your hardware's documentation says to enable it."}}
-        </div>
-        <select id="preemphasis" name="preemphasis">
-          <option value="" {{if eq .Device.PreEmphasis ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.PreEmphasis "0"}}selected{{end}}>Disabled</option>
-          <option value="1" {{if eq .Device.PreEmphasis "1"}}selected{{end}}>Enabled</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="deemphasis">De-emphasis</label>
-          {{template "help" "The matching receive-side counterpart to pre-emphasis. Leave at the default unless your hardware's documentation says to enable it."}}
-        </div>
-        <select id="deemphasis" name="deemphasis">
-          <option value="" {{if eq .Device.DeEmphasis ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.DeEmphasis "0"}}selected{{end}}>Disabled</option>
-          <option value="1" {{if eq .Device.DeEmphasis "1"}}selected{{end}}>Enabled</option>
-        </select>
-      </div>
-    </div>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="plfilter">CTCSS tone filter</label>
-          {{template "help" "Filters the sub-audible CTCSS tone out of the audio that gets repeated, so listeners don't hear a faint tone underneath. Most setups leave this enabled."}}
-        </div>
-        <select id="plfilter" name="plfilter">
-          <option value="" {{if eq .Device.PLFilter ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.PLFilter "0"}}selected{{end}}>Disabled</option>
-          <option value="1" {{if eq .Device.PLFilter "1"}}selected{{end}}>Enabled</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Transmit</h2>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="txprelim">Pre-process transmit audio</label>
-          {{template "help" "Adjusts transmit audio for proper deviation before it reaches the radio. Leave as \"yes\" unless you have a specific reason to disable it."}}
-        </div>
-        <select id="txprelim" name="txprelim">
-          <option value="" {{if eq .Device.TXPrelim ""}}selected{{end}}>(not set)</option>
-          <option value="yes" {{if eq .Device.TXPrelim "yes"}}selected{{end}}>Yes (recommended)</option>
-          <option value="no" {{if eq .Device.TXPrelim "no"}}selected{{end}}>No</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="txmixa">Transmit audio source</label>
-          {{template "help" "Which audio feeds the transmitter. \"voice\" is the standard setting for normal repeater/simplex audio."}}
-        </div>
-        <input type="text" id="txmixa" name="txmixa" value="{{.Device.TXMixA}}" list="tx_audio_sources" placeholder="voice">
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="txmixb">Secondary transmit source (advanced)</label>
-          {{template "help" "Only used in specialized setups mixing a second audio source into transmit. Leave blank for a normal setup."}}
-        </div>
-        <input type="text" id="txmixb" name="txmixb" value="{{.Device.TXMixB}}" list="tx_audio_sources" placeholder="no">
-      </div>
-    </div>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="invertptt">Push-to-talk signal</label>
-          {{template "help" "If your radio never keys up, or keys up constantly and won't stop, switch this — it flips the electrical signal your interface board uses to trigger transmit."}}
-        </div>
-        <select id="invertptt" name="invertptt">
-          <option value="" {{if eq .Device.InvertPTT ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.InvertPTT "0"}}selected{{end}}>Normal (try this first)</option>
-          <option value="1" {{if eq .Device.InvertPTT "1"}}selected{{end}}>Inverted</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="txctcssdefault">Transmit sub-tone (Hz)</label>
-          {{template "help" "The CTCSS/PL tone this node transmits, so other stations' squelch opens for it. Click the field for a list of standard tones. Leave blank if you don't use a transmit tone."}}
-        </div>
-        <input type="text" id="txctcssdefault" name="txctcssdefault" value="{{.Device.TXCTCSSDefault}}" list="ctcss_tones" placeholder="100.0">
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Audio levels</h2>
-    <p class="section-intro">Start around 500 for both and adjust by ear — too low sounds weak or unreadable, too high sounds distorted or overdriven.</p>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="rxmixerset">Receive volume (0-999)</label>
-          {{template "help" "How loud incoming radio audio is, going into the software. Higher numbers = louder."}}
-        </div>
-        <input type="number" id="rxmixerset" name="rxmixerset" min="0" max="999" value="{{.Device.RXMixerSet}}" placeholder="500">
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="txmixerset">Transmit volume (0-999)</label>
-          {{template "help" "How loud the software's audio is, going out to your radio's transmitter. Higher numbers = louder."}}
-        </div>
-        <input type="number" id="txmixerset" name="txmixerset" min="0" max="999" value="{{.Device.TXMixerSet}}" placeholder="500">
-      </div>
-    </div>
-  </div>
-
-  {{if eq .File "usbradio.conf"}}
-  <div class="card">
-    <h2>Advanced hardware settings</h2>
-    <p class="section-intro">Specific to this driver. Leave at the defaults unless your interface board's documentation says otherwise.</p>
-    <div class="row">
-      <div class="field">
-        <div class="label-row">
-          <label for="hdwtype">Interface board model</label>
-          {{template "help" "Identifies your specific USB sound fob hardware. Leave as 0 unless your board's documentation specifies a different number."}}
-        </div>
-        <input type="text" id="hdwtype" name="hdwtype" value="{{.Device.HdwType}}" placeholder="0">
-      </div>
-      <div class="field">
-        <div class="label-row">
-          <label for="duplex3">Extra transmit delay (advanced)</label>
-          {{template "help" "A hardware timing option for certain interface boards. Leave at the default unless instructed to change it."}}
-        </div>
-        <select id="duplex3" name="duplex3">
-          <option value="" {{if eq .Device.Duplex3 ""}}selected{{end}}>(not set)</option>
-          <option value="0" {{if eq .Device.Duplex3 "0"}}selected{{end}}>Off (normal)</option>
-          <option value="1" {{if eq .Device.Duplex3 "1"}}selected{{end}}>On</option>
-        </select>
-      </div>
-    </div>
-  </div>
-  {{end}}
+  {{template "radio_device_fields" .Device}}
 
   <div class="actions">
     <button type="submit" class="primary">Save</button>
-    <a class="btn" href="/radio?file={{.File}}">Cancel</a>
-    {{if not .IsNew}}
+    <a class="btn" href="/system">Cancel</a>
     <span style="flex:1"></span>
-    <button type="submit" formaction="/radio/{{.File}}/{{.Device.Name}}/delete" class="danger" onclick="return confirm('Delete device {{.Device.Name}} from {{.File}}? This cannot be undone.')">Delete device</button>
-    {{end}}
+    <button type="submit" formaction="/system/radio/{{.File}}/{{.Device.Name}}/delete" class="danger" onclick="return confirm('Delete device {{.Device.Name}} from {{.File}}? This cannot be undone.')">Delete device</button>
   </div>
 </form>
 {{end}}
