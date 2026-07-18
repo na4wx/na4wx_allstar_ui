@@ -426,19 +426,22 @@ var companionSectionSpecs = []struct {
 // handleNodeDelete removes number's rpt.conf entry plus everything else
 // this app knows how to attach to a node — its functions/macro/
 // telemetry/morse companion sections, its extensions.conf dialplan
-// entries, and its iax.conf registration/peer stanza — so deleting a
-// node doesn't leave it still trying to register with AllStarLink
-// (found the hard way: a node deleted before that particular cleanup
-// existed kept showing up "Rejected" in iax2 show registry
-// indefinitely, since nothing had ever removed its orphaned register
-// => line) or leave orphaned command/tone sections behind (found via
-// this feature's own end-to-end test). Each cleanup step is attempted
-// even if an earlier one fails, and any failures are reported together
+// entries, its iax.conf registration/peer stanza, and its radio device
+// — so deleting a node doesn't leave it still trying to register with
+// AllStarLink (found the hard way: a node deleted before that
+// particular cleanup existed kept showing up "Rejected" in iax2 show
+// registry indefinitely, since nothing had ever removed its orphaned
+// register => line), leave orphaned command/tone sections behind
+// (found via this feature's own end-to-end test), or leave its radio
+// device stanza behind in usbradio.conf/simpleusb.conf (found the same
+// way — a device left over after "deletion" looks exactly like the
+// node wasn't actually removed). Each cleanup step is attempted even
+// if an earlier one fails, and any failures are reported together
 // rather than stopping partway through.
 //
-// Optionally also deletes the node's radio device, if delete_device=1
-// was submitted — off by default, and skipped (with a clear reason)
-// if another node still references that device.
+// The radio device is skipped (with a clear reason) only if another
+// node still references it — never left behind silently just because
+// the operator didn't think to ask for it.
 func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	if err := r.ParseForm(); err != nil {
@@ -450,7 +453,6 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	deleteDevice := r.FormValue("delete_device") == "1"
 	deviceRef, hasDevice := parseRadioChannel(node.RXChannel)
 
 	if err := s.store.DeleteNode(number); err != nil {
@@ -480,9 +482,9 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.DeletePeer(number); err != nil {
 		failed = append(failed, "iax.conf peer stanza: "+err.Error())
 	}
-	if deleteDevice && hasDevice {
+	if hasDevice {
 		if s.deviceStillReferenced(deviceRef.File, deviceRef.Name, number) {
-			failed = append(failed, "radio device "+deviceRef.Name+" was NOT deleted — another node still references it")
+			// Shared with another node — leave it alone, no failure to report.
 		} else if err := s.store.DeleteRadioDevice(deviceRef.File, deviceRef.Name); err != nil {
 			failed = append(failed, "radio device: "+err.Error())
 		}

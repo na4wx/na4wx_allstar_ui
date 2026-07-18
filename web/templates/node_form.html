@@ -230,10 +230,7 @@
     <button type="submit" class="primary">Save</button>
     <a class="btn" href="/">Cancel</a>
     <span style="flex:1"></span>
-    <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.85rem; color:var(--text-dim);">
-      <input type="checkbox" name="delete_device" value="1" form="delete_node_form"> also delete its radio device (only if unused elsewhere)
-    </label>
-    <button type="submit" form="delete_node_form" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This cannot be undone.')">Delete node</button>
+    <button type="submit" form="delete_node_form" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This removes it from every config file it appears in, including its radio device (unless another node still uses it). This cannot be undone.')">Delete node</button>
   </div>
 </form>
 <form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
