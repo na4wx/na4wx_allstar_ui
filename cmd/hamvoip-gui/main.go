@@ -15,6 +15,7 @@ import (
 
 	"hamvoipconfiggui/internal/auth"
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/nodedb"
 	"hamvoipconfiggui/internal/server"
 	"hamvoipconfiggui/web"
 )
@@ -27,6 +28,9 @@ func main() {
 	asteriskLog := flag.String("asterisk-log", "/var/log/asterisk/full", "path to Asterisk's full log file, shown on the System page (varies with where Asterisk is installed, same as -asterisk-bin)")
 	sa818Tool := flag.String("sa818-tool", "818-prog", "path to the 818-prog SA818/DRA818 radio module programmer, or bare name if it's on PATH (used by the System page's radio module card to send frequency/tone/squelch settings over serial)")
 	sa818StatePath := flag.String("sa818-state-file", "/etc/hamvoip-gui/sa818-last.json", "path to store the last settings sent to the SA818/DRA818 module (there's no way to query the module itself, so this is only a record of what this app last sent)")
+	nodeDBPath := flag.String("node-db-file", nodedb.DefaultPath, "path to the local copy of AllStarLink's node directory (node number -> callsign/description/location), used only to show callsigns beside node numbers; this is the same path ASL's own asl3-update-astdb uses, so other dashboards on the system share it")
+	nodeDBURL := flag.String("node-db-url", nodedb.DefaultURL, "where to download the node directory from, refreshed daily")
+	nodeDBRefresh := flag.Bool("node-db-refresh", true, "download the node directory daily; set false to only read whatever copy already exists on disk and never make outbound requests")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -51,7 +55,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
@@ -62,6 +66,18 @@ func main() {
 	// server.New so constructing a Server (in tests) doesn't shell out
 	// to the asterisk binary.
 	srv.StartLinkHistoryPoller(context.Background())
+
+	// Node directory: read whatever copy is on disk, and (unless
+	// disabled) keep it current. A download failure is logged and
+	// otherwise ignored — this file only decorates node numbers with
+	// callsigns, so nothing about the node's operation depends on it.
+	if *nodeDBRefresh {
+		srv.NodeDB().StartDailyRefresh(context.Background(), func(err error) {
+			log.Printf("node directory: %v", err)
+		})
+	} else if err := srv.NodeDB().LoadFile(); err != nil {
+		log.Printf("node directory: %v", err)
+	}
 
 	log.Printf("hamvoip-gui listening on %s (asterisk config dir: %s)", *addr, *asteriskEtc)
 	if err := http.ListenAndServe(*addr, srv.Handler()); err != nil {

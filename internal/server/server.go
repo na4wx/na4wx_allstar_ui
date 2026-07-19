@@ -12,6 +12,7 @@ import (
 
 	"hamvoipconfiggui/internal/auth"
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/nodedb"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -32,7 +33,15 @@ type Server struct {
 	// linkhistory.go). Always non-nil, so page renders work whether or
 	// not the poller was started.
 	history *linkHistory
+
+	// nodes is AllStarLink's published node directory, used only to show
+	// a callsign beside a node number. Always non-nil; an empty one just
+	// means numbers render without callsigns.
+	nodes *nodedb.Store
 }
+
+// NodeDB exposes the node directory so main can start its refresh loop.
+func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 
 // New builds a Server. templatesFS should contain web/templates and
 // staticFS should contain web/static (both typically embed.FS values
@@ -51,8 +60,8 @@ type Server struct {
 // name, if on PATH) to the 818-prog SA818/DRA818 radio module
 // programmer used by the System page's radio module card; sa818StatePath
 // is where the last settings sent to it are recorded (see internal/sa818).
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory()}
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL)}
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {
@@ -281,7 +290,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
-
 
 func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)

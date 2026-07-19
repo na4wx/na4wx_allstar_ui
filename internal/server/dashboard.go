@@ -139,7 +139,7 @@ func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData)
 		if q.ConnectedErr == "" {
 			s.history.record(node.Number, q.Connected, q.Activity)
 		}
-		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.history.forNode(node.Number))
+		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.nodes, s.history.forNode(node.Number))
 		quick = append(quick, q)
 	}
 

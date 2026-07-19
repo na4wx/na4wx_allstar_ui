@@ -8,6 +8,11 @@ import (
 	"hamvoipconfiggui/internal/system"
 )
 
+// radioInterfaceShari is the "what is the radio hardware" answer
+// meaning a SHARI / SA818-based USB node, which needs the documented
+// SHARI audio preset applied at creation time — see the Interface field.
+const radioInterfaceShari = "shari"
+
 // nodeNewFormData backs the minimal "Add node" setup wizard: just
 // enough fields for this app to derive and write everything else
 // automatically (radio device settings, dialplan entries, IAX2 peer
@@ -15,11 +20,6 @@ import (
 // where all of that becomes visible and editable afterward — this
 // page's entire job is getting there fast for someone who doesn't know
 // what a dial string or a peer context is yet, and shouldn't have to.
-// radioInterfaceShari is the "what is the radio hardware" answer
-// meaning a SHARI / SA818-based USB node, which needs the documented
-// SHARI audio preset applied at creation time — see the Interface field.
-const radioInterfaceShari = "shari"
-
 type nodeNewFormData struct {
 	pageData
 	Number   string
@@ -96,10 +96,10 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := nodeNewFormData{
-		pageData:  pageData{LoggedIn: true},
-		Number:    strings.TrimSpace(r.FormValue("number")),
-		Callsign:  strings.TrimSpace(r.FormValue("callsign")),
-		Duplex: r.FormValue("duplex"),
+		pageData: pageData{LoggedIn: true},
+		Number:   strings.TrimSpace(r.FormValue("number")),
+		Callsign: strings.TrimSpace(r.FormValue("callsign")),
+		Duplex:   r.FormValue("duplex"),
 		// Absent means the same thing the form itself shows selected —
 		// see handleNodeNewForm for why that's SHARI. Letting a missing
 		// field silently mean "generic" would diverge from what the page
@@ -142,10 +142,10 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	// referencing something that doesn't exist (the exact failure mode
 	// that took a real node offline during this app's development).
 	// SimpleUSB is the default driver, matching this app's existing
-	// "safer default for USB sound-fob interfaces" guidance.
-	// A SHARI's carrier-detect line is inverted relative to the generic
-	// default, so without this preset the node reads "receiving"
-	// permanently and transmits continuously the moment it comes up.
+	// "safer default for USB sound-fob interfaces" guidance. A SHARI's
+	// carrier-detect line is inverted relative to that generic default,
+	// so without its preset the node reads "receiving" permanently and
+	// transmits continuously the moment it comes up.
 	device := placeholderRadioDevice(deviceName)
 	if data.Interface == radioInterfaceShari {
 		config.ApplyShariUSBPreset(device)

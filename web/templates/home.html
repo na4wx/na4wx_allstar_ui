@@ -41,7 +41,7 @@
           <tr>
             <td class="nowrap">{{.When}}<span class="muted"> · {{.Ago}}</span></td>
             <td>
-              {{if .Nodes}}{{range .Nodes}}<span class="tag">{{.}}</span> {{end}}{{else}}<span class="muted">nothing connected</span>{{end}}
+              {{if .Nodes}}{{range .Nodes}}<span class="node-chip"{{if .Detail}} title="{{.Detail}}"{{end}}><span class="tag">{{.Number}}</span>{{if .Callsign}}<span class="node-call">{{.Callsign}}</span>{{end}}</span> {{end}}{{else}}<span class="muted">nothing connected</span>{{end}}
             </td>
           </tr>
           {{end}}

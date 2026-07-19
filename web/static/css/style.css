@@ -275,6 +275,22 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   font-variant-numeric: tabular-nums;
 }
 
+/* A node number paired with its callsign from AllStarLink's directory.
+   The callsign is what an operator actually recognizes, so it sits
+   directly alongside the number rather than in a separate column. */
+.node-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-right: 0.4rem;
+}
+.node-call {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
