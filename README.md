@@ -67,11 +67,12 @@ Re-run the same command later to update. It always builds, including when there 
 ### Alternative: cross-compile on a dev machine
 
 1. Cross-compile: `make pi` (or `make pi64` for a 64-bit image).
-2. Copy the binary and `deploy/` directory to the Pi, e.g.:
+2. Copy the binary, the systemd unit, and the deploy script to the Pi:
    ```sh
-   scp bin/hamvoip-gui-armv6 deploy/hamvoip-gui.service deploy/install.sh root@<pi-ip>:/root/hamvoip-gui-deploy/
+   scp bin/hamvoip-gui-armv6 deploy/hamvoip-gui.service deploy/install.sh root@<pi-ip>:/root/
    ```
-3. On the Pi: `cd /root/hamvoip-gui-deploy && sudo ./install.sh hamvoip-gui-armv6`
+   Keep `hamvoip-gui.service` and `install.sh` in the same directory — the script installs the unit file from next to itself.
+3. On the Pi: `cd /root && sudo ./install.sh hamvoip-gui-armv6`
 
    (That's `deploy/install.sh`, copied flat by the `scp` above — not the top-level `install.sh`, which builds from source instead of installing a prebuilt binary.)
 
