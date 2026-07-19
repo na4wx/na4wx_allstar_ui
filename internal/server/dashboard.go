@@ -73,6 +73,14 @@ type nodeQuickStatus struct {
 	// device stanza had vanished, apparently from something outside
 	// this app regenerating the file, e.g. HamVoIP's node-config.sh).
 	MissingDevice *radioChannelRef
+
+	// The two history tables shown for this node, newest first — see
+	// buildLinkTables. ActivityHeaders is taken from app_rpt's own output
+	// rather than named here, so a different app_rpt version's columns
+	// still render correctly.
+	ConnectedHistory []connectedRecord
+	ActivityHeaders  []string
+	ActivityHistory  []activityRecord
 }
 
 type homePageData struct {
@@ -125,6 +133,13 @@ func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData)
 				q.MissingDevice = &ref
 			}
 		}
+		// Fold this render's reading into the history too, so a change
+		// that happened between polls still gets recorded rather than
+		// waiting for the next tick.
+		if q.ConnectedErr == "" {
+			s.history.record(node.Number, q.Connected, q.Activity)
+		}
+		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.history.forNode(node.Number))
 		quick = append(quick, q)
 	}
 

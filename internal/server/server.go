@@ -26,6 +26,12 @@ type Server struct {
 	asteriskLog    string
 	sa818Tool      string
 	sa818StatePath string
+
+	// history is the rolling per-node record of connection changes shown
+	// on the home page, filled by StartLinkHistoryPoller (see
+	// linkhistory.go). Always non-nil, so page renders work whether or
+	// not the poller was started.
+	history *linkHistory
 }
 
 // New builds a Server. templatesFS should contain web/templates and
@@ -46,7 +52,7 @@ type Server struct {
 // programmer used by the System page's radio module card; sa818StatePath
 // is where the last settings sent to it are recorded (see internal/sa818).
 func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath}
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory()}
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {

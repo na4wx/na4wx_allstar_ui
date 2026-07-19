@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io/fs"
 	"log"
@@ -54,6 +55,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
+
+	// Sample each node's link state in the background so the home page's
+	// connection history reflects what actually happened, not just what
+	// someone had the page open for. Started here rather than in
+	// server.New so constructing a Server (in tests) doesn't shell out
+	// to the asterisk binary.
+	srv.StartLinkHistoryPoller(context.Background())
 
 	log.Printf("hamvoip-gui listening on %s (asterisk config dir: %s)", *addr, *asteriskEtc)
 	if err := http.ListenAndServe(*addr, srv.Handler()); err != nil {

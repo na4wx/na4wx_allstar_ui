@@ -125,6 +125,35 @@ table th, table td {
 }
 table th { color: var(--text-dim); font-weight: 500; font-size: 0.85rem; }
 
+/* History tables on the home page. Wrapped in .table-scroll so a wide
+   table (app_rpt's lstats has six columns plus a timestamp) scrolls
+   inside its own card instead of stretching the whole page sideways. */
+.table-scroll { overflow-x: auto; }
+.data-table { font-size: 0.85rem; }
+.data-table th {
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.72rem;
+}
+.data-table td { vertical-align: top; }
+.data-table tbody tr:last-child td { border-bottom: none; }
+.nowrap { white-space: nowrap; }
+.muted { color: var(--text-dim); font-size: 0.85em; }
+
+/* A connected node number. Reads as a discrete item, so several in one
+   cell stay legible without needing separators. */
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  margin: 0.1rem 0.15rem 0.1rem 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
