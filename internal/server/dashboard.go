@@ -81,6 +81,22 @@ type nodeQuickStatus struct {
 	ConnectedHistory []connectedRecord
 	ActivityHeaders  []string
 	ActivityHistory  []activityRecord
+
+	// Live state from "rpt stats". Receiving means someone is keying
+	// this node's receiver right now; see nodeReceiving for what that
+	// does and doesn't cover. StatsRaw is shown instead of the table
+	// when the output didn't parse.
+	Stats     statFields
+	StatsOK   bool
+	StatsRaw  string
+	StatsErr  string
+	Receiving bool
+
+	// NowConnected is the current connected-node list with callsigns —
+	// the same data as the newest history row, surfaced separately so
+	// the live card doesn't make the reader parse a table to answer
+	// "who is on right now".
+	NowConnected []connectedNode
 }
 
 type homePageData struct {
@@ -140,6 +156,19 @@ func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData)
 			s.history.record(node.Number, q.Connected, q.Activity)
 		}
 		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.nodes, s.history.forNode(node.Number))
+
+		// Live state, for the card at the top of this node's block.
+		if out, err := system.AsteriskRX(r.Context(), s.asteriskBin, "rpt stats "+node.Number); err != nil {
+			q.StatsErr = err.Error()
+		} else {
+			q.StatsRaw = out
+			q.Stats, q.StatsOK = parseRptStats(out)
+			q.Receiving = nodeReceiving(q.Stats)
+		}
+		for _, number := range parseConnectedNodes(q.Connected) {
+			q.NowConnected = append(q.NowConnected, describeNode(s.nodes, number))
+		}
+
 		quick = append(quick, q)
 	}
 

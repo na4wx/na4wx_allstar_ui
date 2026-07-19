@@ -275,6 +275,45 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   font-variant-numeric: tabular-nums;
 }
 
+/* Live-status card heading: title on the left, on-air pill on the
+   right, wrapping instead of colliding on a narrow screen. */
+.live-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+/* rpt stats renders as label/value rows rather than columns, so the
+   row headers are left-aligned and sized like body text, not like the
+   column headings of the history tables. */
+.stats-table th[scope="row"] {
+  position: static;
+  background: transparent;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: normal;
+  font-size: 0.86rem;
+  width: 55%;
+}
+.stats-table td {
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.raw-block {
+  font-size: 0.8rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  margin: 0;
+}
+
 /* A node number paired with its callsign from AllStarLink's directory.
    The callsign is what an operator actually recognizes, so it sits
    directly alongside the number rather than in a separate column. */

@@ -19,9 +19,48 @@
 </div>
 {{end}}
 <div class="card">
+  <div class="live-head">
+    <div class="label-row">
+      <h2 style="margin:0">Right now — node {{.Node.Number}}</h2>
+      {{template "help" "Live state from app_rpt's own rpt stats command, re-read each time this page loads. \"On the air\" means someone is keying this node's receiver over the radio at this moment. Audio arriving from a linked node over the internet does not set that flag, and this version of app_rpt reports no per-link keyed state at all, so it can't say which connected station is talking."}}
+    </div>
+    {{if .Receiving}}
+    <span class="status-pill down"><span class="dot"></span>On the air — signal on input</span>
+    {{else}}
+    <span class="status-pill up"><span class="dot"></span>Idle — no signal on input</span>
+    {{end}}
+  </div>
+
+  <div class="field">
+    <label>Connected right now</label>
+    {{if .NowConnected}}
+      {{range .NowConnected}}<span class="node-chip"{{if .Detail}} title="{{.Detail}}"{{end}}><span class="tag">{{.Number}}</span>{{if .Callsign}}<span class="node-call">{{.Callsign}}</span>{{end}}</span> {{end}}
+    {{else}}
+      <div class="hint">Nothing connected.</div>
+    {{end}}
+  </div>
+
+  {{if .StatsErr}}
+  <p class="hint">Could not read live status: {{.StatsErr}}</p>
+  {{else if .StatsOK}}
+  <div class="table-scroll">
+    <table class="data-table stats-table">
+      <tbody>
+        {{range .Stats}}
+        <tr><th scope="row">{{.Label}}</th><td>{{.Value}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else if .StatsRaw}}
+  <pre class="raw-block">{{.StatsRaw}}</pre>
+  {{end}}
+</div>
+
+<div class="card">
   <div class="label-row">
-    <h2 style="margin:0">Node {{.Node.Number}}</h2>
-    {{template "help" "A live glance at this node plus one-click link/unlink. For radio hardware, command list, macros, registration, and everything else, open the full node page."}}
+    <h2 style="margin:0">Node {{.Node.Number}} history</h2>
+    {{template "help" "How this node's connections have changed over time. A new record is kept each time the connected-node list changes, retaining the last 10."}}
   </div>
   <div class="field">
     <div class="label-row">

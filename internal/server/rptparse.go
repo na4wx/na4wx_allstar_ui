@@ -98,6 +98,63 @@ func parseLstats(out string) (headers []string, rows [][]string, ok bool) {
 	return headers, rows, true
 }
 
+// statField is one "Label.........: Value" line from "rpt stats".
+type statField struct {
+	Label string
+	Value string
+}
+
+// statFields wraps the parsed block so a value can be looked up by label
+// without re-scanning at each call site.
+type statFields []statField
+
+// Value returns the value for an exact label, or "" if absent. Labels
+// are matched exactly rather than by prefix so a future app_rpt adding
+// e.g. "Signal on input B" can't be mistaken for "Signal on input".
+func (s statFields) Value(label string) string {
+	for _, f := range s {
+		if f.Label == label {
+			return f.Value
+		}
+	}
+	return ""
+}
+
+// parseRptStats turns "rpt stats <node>" output into label/value pairs.
+// The format is a label padded with dots, a colon, then the value:
+//
+//	Signal on input..................................: NO
+//	TX time today....................................: 00:00:00.0
+//
+// Splitting at the first colon is what makes the time values work —
+// they contain colons of their own, but always after the separator. The
+// banner line and blank lines are skipped.
+//
+// ok is false when nothing parsed, so the caller can fall back to
+// showing the raw text rather than an empty panel that would read as
+// "this node has no status".
+func parseRptStats(out string) (statFields, bool) {
+	var fields statFields
+	for _, line := range strings.Split(out, "\n") {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.Contains(t, "***") {
+			continue
+		}
+		i := strings.Index(t, ":")
+		if i < 0 {
+			continue
+		}
+		label := strings.TrimRight(strings.TrimSpace(t[:i]), ".")
+		label = strings.TrimSpace(label)
+		value := strings.TrimSpace(t[i+1:])
+		if label == "" {
+			continue
+		}
+		fields = append(fields, statField{Label: label, Value: value})
+	}
+	return fields, len(fields) > 0
+}
+
 // displayHeader softens a column heading for display: app_rpt prints
 // its headings in all caps ("CONNECT TIME"), which reads as raw machine
 // output on a page meant for people who don't think in CLI. Only
@@ -135,4 +192,18 @@ func parseConnectedNodes(out string) []string {
 		}
 	}
 	return nodes
+}
+
+// nodeReceiving reports whether someone is keying this node's receiver
+// right now, from "rpt stats"'s "Signal on input" field.
+//
+// This is the local RF input specifically. Audio arriving from a linked
+// node over the internet does not set it, and this app_rpt build's CLI
+// exposes no per-link keyed state at all — "rpt lstats" here reports
+// connection state and timers, not who is talking. So this answers "is
+// someone transmitting into this node" and deliberately does not claim
+// to answer "which connected station is currently talking", which the
+// available data cannot support.
+func nodeReceiving(fields statFields) bool {
+	return strings.EqualFold(fields.Value("Signal on input"), "YES")
 }
