@@ -88,17 +88,27 @@
     <p class="hint">No records yet — the first one appears as soon as this node's connections change.</p>
     {{end}}
   </div>
+  <div class="actions">
+    <a class="btn" href="/nodes/{{.Node.Number}}">Full node settings</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Connect node {{.Node.Number}} to another node</h2>
+    {{template "help" "Sends the standard AllStarLink touch-tone command to link (*3) or unlink (*1) — the same thing you'd key in over the air, without needing a radio in your hand. The result shows up in the tables above once the connection changes."}}
+  </div>
   <form method="post" action="/nodes/{{.Node.Number}}/link" onsubmit="return confirm('Send this link/unlink command to node {{.Node.Number}} now?')">
     <div class="row">
       <div class="field">
         <label for="quick_target_{{.Node.Number}}">Other node's number</label>
         <input type="text" id="quick_target_{{.Node.Number}}" name="target" placeholder="2000" required>
+        <div class="hint">The node you want to connect to, e.g. 2000.</div>
       </div>
     </div>
-    <div class="actions" style="margin-top:0">
+    <div class="actions">
       <button type="submit" name="action" value="link" class="primary">Link</button>
       <button type="submit" name="action" value="unlink">Unlink</button>
-      <a class="btn" href="/nodes/{{.Node.Number}}">Full node settings</a>
     </div>
   </form>
 </div>
