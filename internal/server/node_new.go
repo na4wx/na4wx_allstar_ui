@@ -15,11 +15,26 @@ import (
 // where all of that becomes visible and editable afterward — this
 // page's entire job is getting there fast for someone who doesn't know
 // what a dial string or a peer context is yet, and shouldn't have to.
+// radioInterfaceShari is the "what is the radio hardware" answer
+// meaning a SHARI / SA818-based USB node, which needs the documented
+// SHARI audio preset applied at creation time — see the Interface field.
+const radioInterfaceShari = "shari"
+
 type nodeNewFormData struct {
 	pageData
-	Number     string
-	Callsign   string
-	Duplex     string
+	Number   string
+	Callsign string
+	Duplex   string
+
+	// Interface is which radio hardware this node uses. It exists for
+	// one specific, very visible failure: the generic default is
+	// carrierfrom=usb, but a SHARI's carrier-detect line is inverted, so
+	// with the generic value the node reads "receiving" permanently and
+	// holds the transmitter keyed from the moment it's created. Asking
+	// once here is the difference between a working node and one that
+	// sits on the air transmitting continuously.
+	Interface string
+
 	DeviceHint string
 
 	// DetectedDevice is set when exactly one USB sound device is
@@ -49,8 +64,15 @@ func defaultNodeIDRecording(callsign string) string {
 	return "|i" + strings.ToUpper(strings.TrimSpace(callsign))
 }
 
+// handleNodeNewForm defaults Interface to SHARI. The two ways to get
+// this wrong are not equally bad: answering SHARI on generic hardware
+// makes the node deaf (annoying, obvious, harmless), while answering
+// generic on a SHARI makes it hold the transmitter down continuously,
+// which jams the frequency for everyone else. Defaulting to the answer
+// whose failure mode stays off the air is the safer starting point, and
+// either way it's one click to change on the node's own page afterward.
 func (s *Server) handleNodeNewForm(w http.ResponseWriter, r *http.Request) {
-	data := nodeNewFormData{pageData: pageData{LoggedIn: true}, Duplex: "1"}
+	data := nodeNewFormData{pageData: pageData{LoggedIn: true}, Duplex: "1", Interface: radioInterfaceShari}
 	s.detectRadioDevice(&data)
 	s.render(w, "node_new.html", data)
 }
@@ -74,10 +96,16 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := nodeNewFormData{
-		pageData: pageData{LoggedIn: true},
-		Number:   strings.TrimSpace(r.FormValue("number")),
-		Callsign: strings.TrimSpace(r.FormValue("callsign")),
-		Duplex:   r.FormValue("duplex"),
+		pageData:  pageData{LoggedIn: true},
+		Number:    strings.TrimSpace(r.FormValue("number")),
+		Callsign:  strings.TrimSpace(r.FormValue("callsign")),
+		Duplex: r.FormValue("duplex"),
+		// Absent means the same thing the form itself shows selected —
+		// see handleNodeNewForm for why that's SHARI. Letting a missing
+		// field silently mean "generic" would diverge from what the page
+		// displays, which is exactly the bug class that made the
+		// registration form appear to save and write nothing.
+		Interface: defaultIfBlank(r.FormValue("interface"), radioInterfaceShari),
 	}
 	regPassword := r.FormValue("reg_password")
 	deviceName := strings.TrimSpace(r.FormValue("device_hint"))
@@ -115,7 +143,13 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	// that took a real node offline during this app's development).
 	// SimpleUSB is the default driver, matching this app's existing
 	// "safer default for USB sound-fob interfaces" guidance.
+	// A SHARI's carrier-detect line is inverted relative to the generic
+	// default, so without this preset the node reads "receiving"
+	// permanently and transmits continuously the moment it comes up.
 	device := placeholderRadioDevice(deviceName)
+	if data.Interface == radioInterfaceShari {
+		config.ApplyShariUSBPreset(device)
+	}
 	if err := s.store.SaveRadioDevice(config.SimpleusbConfFile, device); err != nil {
 		fail("Couldn't set up the radio device: " + err.Error())
 		return

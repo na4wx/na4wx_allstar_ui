@@ -40,6 +40,18 @@
       </select>
     </div>
 
+    <div class="field">
+      <div class="label-row">
+        <label for="interface">Radio interface</label>
+        {{template "help" "SHARI and similar SA818 USB nodes detect incoming signals on an inverted line compared to a generic USB sound interface. Getting this wrong is very visible: pick \"generic\" on a SHARI and the node believes it's receiving all the time, so it keys the transmitter and holds it down continuously. Pick \"SHARI\" on generic hardware and the node simply never hears anything. Either way you can change it afterward from the node's own page."}}
+      </div>
+      <select id="interface" name="interface">
+        <option value="shari" {{if or (eq .Interface "") (eq .Interface "shari")}}selected{{end}}>SHARI / SA818 USB node (most ready-made kits)</option>
+        <option value="generic" {{if eq .Interface "generic"}}selected{{end}}>Generic USB sound interface (RIM, RA-40, homebrew)</option>
+      </select>
+      <div class="hint">If your node starts transmitting constantly right after setup, this is the setting to change.</div>
+    </div>
+
     {{if .DetectedDevice}}
     <div class="field">
       <div class="label-row">
