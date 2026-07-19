@@ -1,4 +1,4 @@
-# HamVoIP Config GUI
+# NA4WX Allstar Dashboard
 
 A browser-based configuration tool for a [HamVoIP](http://hamvoip.org/) AllStarLink/Asterisk node — edit `rpt.conf`, `iax.conf`, `usbradio.conf`/`simpleusb.conf`, and system/network settings without SSH or a text editor.
 
