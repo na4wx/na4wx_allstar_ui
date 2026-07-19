@@ -14,6 +14,48 @@ import (
 // Offered alongside real node numbers in the same picker.
 const standardCommandSetSentinel = "__standard__"
 
+// Standard AllStarLink registration/peer values. These are the settings
+// that are correct for essentially every normal node, so this app fills
+// them in rather than asking — see defaultIfBlank for why they can't be
+// left to the form's placeholder text.
+const (
+	defaultRegistrationHost = "register.allstarlink.org"
+	defaultPeerType         = "friend"
+	defaultPeerContext      = "radio-secure"
+	defaultPeerHost         = "dynamic"
+	defaultPeerAuth         = "md5"
+)
+
+// defaultIfBlank returns def when v is blank. This exists because of a
+// real bug: the registration form showed its defaults as HTML
+// placeholder text, which is only grey ghost text and is NEVER submitted
+// with the form. So a node that had never registered submitted a blank
+// server field, SaveRegistration rejected the whole save with "node,
+// password, and host are required", and nothing was written — the
+// operator typed a password, hit save, got a cryptic error, and the node
+// silently never registered. Applying the defaults here means the save
+// works regardless of what the form does or doesn't submit.
+func defaultIfBlank(v, def string) string {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	return v
+}
+
+// defaultNodePeer builds the standard IAX2 peer stanza for a node, so
+// the setup wizard and the node page's registration form can't drift
+// apart on what "the normal settings" are.
+func defaultNodePeer(number, secret string) *config.Peer {
+	return &config.Peer{
+		Node:    number,
+		Type:    defaultPeerType,
+		Context: defaultPeerContext,
+		Host:    defaultPeerHost,
+		Secret:  secret,
+		Auth:    defaultPeerAuth,
+	}
+}
+
 // nodeFormData backs the consolidated node edit page: identity, radio
 // hardware (pick an existing device or create one inline), timing,
 // command/tone set, AllStarLink registration, and live connection
@@ -323,31 +365,36 @@ func (s *Server) handleNodeRegistrationSave(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Every "normal" value is defaulted here rather than being required
+	// from the form — see defaultIfBlank. The password is the only thing
+	// that genuinely varies per node and can't be guessed.
 	reg := config.Registration{
 		Node:     number,
 		Password: r.FormValue("reg_password"),
-		Host:     r.FormValue("reg_host"),
+		Host:     defaultIfBlank(r.FormValue("reg_host"), defaultRegistrationHost),
 		Port:     r.FormValue("reg_port"),
 	}
-	peer := &config.Peer{
-		Node:    number,
-		Type:    r.FormValue("peer_type"),
-		Context: r.FormValue("peer_context"),
-		Host:    r.FormValue("peer_host"),
-		Secret:  r.FormValue("peer_secret"),
-		Auth:    r.FormValue("peer_auth"),
+	if reg.Password == "" {
+		s.renderNodeEditPage(w, r, number, flash("error", "Enter the AllStarLink registration password for node "+number+" — without it this node can't register, and connections to other nodes will be refused."))
+		return
 	}
 
-	var saveErr error
-	if reg.Password != "" || reg.Host != "" {
-		saveErr = s.store.SaveRegistration(reg)
-	}
-	if saveErr == nil && (peer.Type != "" || peer.Context != "" || peer.Secret != "") {
-		saveErr = s.store.SavePeer(peer)
-	}
+	peer := defaultNodePeer(number, defaultIfBlank(r.FormValue("peer_secret"), reg.Password))
+	peer.Type = defaultIfBlank(r.FormValue("peer_type"), defaultPeerType)
+	peer.Context = defaultIfBlank(r.FormValue("peer_context"), defaultPeerContext)
+	peer.Host = defaultIfBlank(r.FormValue("peer_host"), defaultPeerHost)
+	peer.Auth = defaultIfBlank(r.FormValue("peer_auth"), defaultPeerAuth)
 
-	if saveErr != nil {
-		s.renderNodeEditPage(w, r, number, flash("error", saveErr.Error()))
+	// Registration and peer are written together: a register line without
+	// a matching peer stanza leaves the node half-configured, which is
+	// exactly the state that makes remote nodes accept a connection and
+	// then immediately hang up.
+	if err := s.store.SaveRegistration(reg); err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
+		return
+	}
+	if err := s.store.SavePeer(peer); err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)

@@ -173,19 +173,12 @@ func (s *Server) handleNodeCreate(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.SaveRegistration(config.Registration{
 		Node:     n.Number,
 		Password: regPassword,
-		Host:     "register.allstarlink.org",
+		Host:     defaultRegistrationHost,
 	}); err != nil {
 		warn("Node created, but AllStarLink registration failed: " + err.Error() + " — retry from the registration section below.")
 		return
 	}
-	if err := s.store.SavePeer(&config.Peer{
-		Node:    n.Number,
-		Type:    "friend",
-		Context: "radio-secure",
-		Host:    "dynamic",
-		Secret:  regPassword,
-		Auth:    "md5",
-	}); err != nil {
+	if err := s.store.SavePeer(defaultNodePeer(n.Number, regPassword)); err != nil {
 		warn("Node created, but AllStarLink registration failed: " + err.Error() + " — retry from the registration section below.")
 		return
 	}

@@ -245,7 +245,7 @@
           <label for="reg_host">AllStarLink server</label>
           {{template "help" "The server your node connects to. Use register.allstarlink.org unless AllStarLink support told you otherwise."}}
         </div>
-        <input type="text" id="reg_host" name="reg_host" value="{{if .Registration}}{{.Registration.Host}}{{end}}" placeholder="register.allstarlink.org">
+        <input type="text" id="reg_host" name="reg_host" value="{{if .Registration}}{{.Registration.Host}}{{else}}register.allstarlink.org{{end}}" placeholder="register.allstarlink.org">
       </div>
       <div class="field">
         <div class="label-row">
@@ -272,8 +272,8 @@
           {{template "help" "Almost always \"friend\" — controls how this node identifies itself when connecting."}}
         </div>
         <select id="peer_type" name="peer_type">
-          <option value="" {{if or (not .Peer) (eq .Peer.Type "")}}selected{{end}}>(not set)</option>
-          <option value="friend" {{if and .Peer (eq .Peer.Type "friend")}}selected{{end}}>friend (normal)</option>
+          <option value="" {{if and .Peer (eq .Peer.Type "")}}selected{{end}}>(not set)</option>
+          <option value="friend" {{if or (not .Peer) (eq .Peer.Type "friend")}}selected{{end}}>friend (normal)</option>
           <option value="peer" {{if and .Peer (eq .Peer.Type "peer")}}selected{{end}}>peer</option>
           <option value="user" {{if and .Peer (eq .Peer.Type "user")}}selected{{end}}>user</option>
         </select>
@@ -283,14 +283,14 @@
           <label for="peer_context">Routing category</label>
           {{template "help" "Internal category for incoming connections. Typically radio-secure — don't change this unless you were specifically told to."}}
         </div>
-        <input type="text" id="peer_context" name="peer_context" value="{{if .Peer}}{{.Peer.Context}}{{end}}" placeholder="radio-secure">
+        <input type="text" id="peer_context" name="peer_context" value="{{if .Peer}}{{.Peer.Context}}{{else}}radio-secure{{end}}" placeholder="radio-secure">
       </div>
       <div class="field">
         <div class="label-row">
           <label for="peer_host">Network address</label>
           {{template "help" "Almost always \"dynamic\" — meaning your node's internet address can change, which is normal for a home internet connection."}}
         </div>
-        <input type="text" id="peer_host" name="peer_host" value="{{if .Peer}}{{.Peer.Host}}{{end}}" placeholder="dynamic">
+        <input type="text" id="peer_host" name="peer_host" value="{{if .Peer}}{{.Peer.Host}}{{else}}dynamic{{end}}" placeholder="dynamic">
       </div>
     </div>
     <div class="row">
@@ -307,8 +307,8 @@
           {{template "help" "How the password above is verified. md5 is the common default; use whatever AllStarLink support tells you if you're unsure."}}
         </div>
         <select id="peer_auth" name="peer_auth">
-          <option value="" {{if or (not .Peer) (eq .Peer.Auth "")}}selected{{end}}>(not set)</option>
-          <option value="md5" {{if and .Peer (eq .Peer.Auth "md5")}}selected{{end}}>md5 (common default)</option>
+          <option value="" {{if and .Peer (eq .Peer.Auth "")}}selected{{end}}>(not set)</option>
+          <option value="md5" {{if or (not .Peer) (eq .Peer.Auth "md5")}}selected{{end}}>md5 (common default)</option>
           <option value="rsa" {{if and .Peer (eq .Peer.Auth "rsa")}}selected{{end}}>rsa</option>
           <option value="plaintext" {{if and .Peer (eq .Peer.Auth "plaintext")}}selected{{end}}>plaintext</option>
         </select>
