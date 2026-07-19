@@ -1,10 +1,15 @@
 #!/bin/bash
 # Run this ON THE PI, as root, from inside the cloned repo (Arch Linux
 # ARM — HamVoIP's OS). It makes sure the tools needed to build this
-# project are installed, pulls the latest code, and — only if that pull
-# actually brought something new — builds natively and redeploys via
-# deploy/install.sh. If there's nothing new to pull, it exits without
-# touching the running service.
+# project are installed, pulls the latest code if there is any, then
+# builds natively and redeploys via deploy/install.sh.
+#
+# It always builds and deploys, including when the pull found nothing
+# new. That matters for a first-time install: the user has just cloned,
+# so there is nothing to fetch, and skipping the build in that case
+# leaves them with no binary installed at all. Go's build cache makes a
+# no-change rebuild cheap, so the cost of always building is small next
+# to the cost of silently doing nothing.
 #
 # Usage: sudo ./install.sh
 
@@ -96,10 +101,6 @@ fi
 
 # --- pull latest ---------------------------------------------------------
 
-if [ -n "$(git status --porcelain)" ]; then
-	err "working tree has uncommitted changes — commit or stash them first, then re-run"
-fi
-
 log "Fetching latest from git"
 git fetch origin
 
@@ -108,12 +109,21 @@ LOCAL=$(git rev-parse @)
 REMOTE=$(git rev-parse "@{u}" 2>/dev/null) || err "branch $BRANCH has no upstream — check out a branch that tracks origin"
 
 if [ "$LOCAL" = "$REMOTE" ]; then
-	log "Already up to date ($LOCAL) — nothing to build or deploy"
-	exit 0
+	# Nothing to pull, but still build and deploy below. A first-time
+	# install is exactly this case — the user just cloned, so there is
+	# by definition nothing new to fetch, and an earlier version of this
+	# script exited here and left them with no binary installed at all.
+	log "Already up to date ($LOCAL) — building and deploying the current checkout"
+else
+	# Only require a clean tree when there is actually something to
+	# merge. Someone who tweaked a file locally and just wants to
+	# rebuild shouldn't be blocked by a pull they don't need.
+	if [ -n "$(git status --porcelain)" ]; then
+		err "working tree has uncommitted changes and origin/$BRANCH has new commits — commit or stash, then re-run"
+	fi
+	log "Updating $BRANCH: $LOCAL -> $REMOTE"
+	git pull --ff-only origin "$BRANCH"
 fi
-
-log "Updating $BRANCH: $LOCAL -> $REMOTE"
-git pull --ff-only origin "$BRANCH"
 
 # --- build and deploy -----------------------------------------------------
 
