@@ -145,7 +145,10 @@ func buildLinkTables(snaps []linkSnapshot) (connected []connectedRecord, headers
 		connected = append(connected, connectedRecord{When: when, Ago: ago, Nodes: snap.Nodes})
 
 		if headers == nil && snap.ActivityOK {
-			headers = snap.Headers
+			headers = make([]string, len(snap.Headers))
+			for i, h := range snap.Headers {
+				headers[i] = displayHeader(h)
+			}
 		}
 		if !snap.ActivityOK || len(snap.Rows) == 0 {
 			activity = append(activity, activityRecord{When: when, Ago: ago, Empty: true})

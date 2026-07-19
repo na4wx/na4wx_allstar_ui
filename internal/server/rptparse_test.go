@@ -120,3 +120,22 @@ func TestParseLstatsUnrecognized(t *testing.T) {
 		t.Error("expected ok=false for output with no separator row")
 	}
 }
+
+// TestDisplayHeader covers the presentational softening of app_rpt's
+// all-caps headings, including the guard that leaves already-mixed-case
+// headings from a hypothetical future version untouched.
+func TestDisplayHeader(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"NODE", "Node"},
+		{"CONNECT TIME", "Connect time"},
+		{"CONNECT STATE", "Connect state"},
+		{"RECONNECTS", "Reconnects"},
+		{"Connect Time", "Connect Time"}, // already mixed case: leave alone
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := displayHeader(c.in); got != c.want {
+			t.Errorf("displayHeader(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

@@ -98,6 +98,21 @@ func parseLstats(out string) (headers []string, rows [][]string, ok bool) {
 	return headers, rows, true
 }
 
+// displayHeader softens a column heading for display: app_rpt prints
+// its headings in all caps ("CONNECT TIME"), which reads as raw machine
+// output on a page meant for people who don't think in CLI. Only
+// all-caps headings are touched, so a future app_rpt version already
+// using mixed case is left exactly as it wrote it. This is presentation
+// only — the heading words themselves are still app_rpt's, not this
+// app's invention.
+func displayHeader(h string) string {
+	if h == "" || h != strings.ToUpper(h) {
+		return h
+	}
+	lower := strings.ToLower(h)
+	return strings.ToUpper(lower[:1]) + lower[1:]
+}
+
 // parseConnectedNodes pulls the node numbers out of "rpt nodes" output,
 // which wraps its list in a "**** CONNECTED NODES ****" banner and uses
 // the literal "<NONE>" when nothing is connected. Returns an empty slice
