@@ -104,11 +104,16 @@
     const signalCell = card.querySelector("[data-live-signal]");
     const indicator = card.querySelector("[data-live-indicator]");
 
+    const historyBox = document.querySelector(
+      '[data-live-history]'
+    );
+
     const es = new EventSource("/nodes/" + encodeURIComponent(node) + "/live", {
       withCredentials: true,
     });
 
-    es.onmessage = (ev) => {
+    // "live" event: the right-now card (pill, connected chips, signal cell).
+    es.addEventListener("live", (ev) => {
       let s;
       try {
         s = JSON.parse(ev.data);
@@ -119,13 +124,84 @@
       if (pillBox) renderPill(pillBox, s.receiving);
       if (connBox) renderConnected(connBox, s.connected);
       if (signalCell && s.signalOnInput) signalCell.textContent = s.signalOnInput;
-    };
+    });
+
+    // "history" event: the whole history card, re-rendered server-side and
+    // swapped in, so the connection-history tables update without a reload
+    // and without duplicating their markup here. The payload is a
+    // JSON-encoded HTML string produced by the same template as page load.
+    es.addEventListener("history", (ev) => {
+      if (!historyBox) return;
+      let html;
+      try {
+        html = JSON.parse(ev.data);
+      } catch (e) {
+        return;
+      }
+      if (typeof html === "string" && html.length) historyBox.innerHTML = html;
+    });
 
     es.onerror = () => {
       // EventSource retries on its own; just dim the live indicator while
       // the connection is down so the card doesn't look falsely live.
       if (indicator) indicator.classList.remove("on");
     };
+  });
+})();
+
+// Link/unlink without a full-page reload: submit the quick-connect form
+// in the background and show the result inline. The live stream above
+// then reflects the connection appearing or dropping on its own. Falls
+// back to a normal form POST if fetch is unavailable.
+(function () {
+  const forms = document.querySelectorAll("form[data-ajax-link]");
+  if (!forms.length || typeof fetch === "undefined") return;
+
+  forms.forEach((form) => {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const confirmMsg = form.getAttribute("data-confirm");
+      if (confirmMsg && !window.confirm(confirmMsg)) return;
+
+      const result = form.querySelector("[data-link-result]");
+      const params = new URLSearchParams(new FormData(form));
+      // FormData omits the submit button; carry which one was clicked.
+      if (e.submitter && e.submitter.name) {
+        params.set(e.submitter.name, e.submitter.value);
+      }
+
+      const buttons = form.querySelectorAll("button");
+      buttons.forEach((b) => (b.disabled = true));
+
+      function show(ok, msg) {
+        if (!result) return;
+        result.hidden = false;
+        result.textContent = msg;
+        result.classList.toggle("ok", ok);
+        result.classList.toggle("error", !ok);
+      }
+
+      // getAttribute, not form.action: the submit buttons are named
+      // "action", which DOM-clobbers the form's .action URL property into
+      // returning the button collection instead of the endpoint.
+      const endpoint = form.getAttribute("action");
+
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          body: params,
+          headers: { Accept: "application/json" },
+          credentials: "same-origin",
+        });
+        const j = await res.json();
+        show(!!j.ok, j.message || (j.ok ? "Done" : "Failed"));
+      } catch (err) {
+        show(false, "Request failed — check the connection and try again.");
+      } finally {
+        buttons.forEach((b) => (b.disabled = false));
+      }
+    });
   });
 })();
 

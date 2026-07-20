@@ -298,6 +298,28 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   .live-dot.on { animation: none; }
 }
 
+/* Inline result of a background link/unlink, shown without reloading. */
+.link-result {
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  border: 1px solid transparent;
+  border-left-width: 3px;
+}
+.link-result.ok {
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 25%, transparent);
+  border-left-color: var(--ok);
+  color: color-mix(in srgb, var(--ok) 80%, var(--text));
+}
+.link-result.error {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 25%, transparent);
+  border-left-color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 80%, var(--text));
+}
+
 /* Live-status card heading: title on the left, on-air pill on the
    right, wrapping instead of colliding on a narrow screen. */
 .live-head {

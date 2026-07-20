@@ -86,7 +86,7 @@ func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
 		// "radio_device_fields" ...}}), included for every page since
 		// it's harmless where unused and needed by both node_form.html
 		// and radio_form.html.
-		t, err := template.ParseFS(templatesFS, "layout.html", "radio_device_fields.html", page)
+		t, err := template.ParseFS(templatesFS, "layout.html", "radio_device_fields.html", "node_history.html", page)
 		if err != nil {
 			return nil, err
 		}

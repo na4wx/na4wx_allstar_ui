@@ -221,15 +221,31 @@ func (s *Server) handleNodesSyncExtensions(w http.ResponseWriter, r *http.Reques
 // (asterisk -rx "rpt fun <node> <digits>"), scoped to just these two
 // standard AllStarLink codes rather than an arbitrary typed sequence,
 // since this is meant to be a one-click shortcut.
+//
+// It answers in JSON when the caller asks (the home page's fetch does),
+// so the command can be sent without a full-page reload — the live SSE
+// stream then reflects the connection appearing or dropping. A plain
+// form POST (no JS) still works and re-renders Home with a flash, so the
+// action degrades gracefully.
 func (s *Server) handleNodeLink(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
+	wantsJSON := strings.Contains(r.Header.Get("Accept"), "application/json")
+
+	fail := func(msg string) {
+		if wantsJSON {
+			writeJSON(w, map[string]any{"ok": false, "message": msg})
+			return
+		}
+		s.renderHome(w, r, flash("error", msg))
+	}
+
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		fail("bad form")
 		return
 	}
 	target := strings.TrimSpace(r.FormValue("target"))
 	if target == "" {
-		s.renderHome(w, r, flash("error", "Enter a node number to link or unlink"))
+		fail("Enter a node number to link or unlink")
 		return
 	}
 
@@ -240,18 +256,22 @@ func (s *Server) handleNodeLink(w http.ResponseWriter, r *http.Request) {
 	case "unlink":
 		digits = "*1" + target
 	default:
-		s.renderHome(w, r, flash("error", "Unknown action"))
+		fail("Unknown action")
 		return
 	}
 
 	out, err := system.AsteriskRX(r.Context(), s.asteriskBin, "rpt fun "+number+" "+digits)
 	if err != nil {
-		s.renderHome(w, r, flash("error", err.Error()))
+		fail(err.Error())
 		return
 	}
 	msg := "Sent " + digits + " to node " + number
-	if strings.TrimSpace(out) != "" {
-		msg += ": " + strings.TrimSpace(out)
+	if trimmed := strings.TrimSpace(out); trimmed != "" {
+		msg += ": " + trimmed
+	}
+	if wantsJSON {
+		writeJSON(w, map[string]any{"ok": true, "message": msg})
+		return
 	}
 	s.renderHome(w, r, flash("ok", msg))
 }

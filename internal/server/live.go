@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -37,23 +39,52 @@ type liveNodeState struct {
 	Connected     []connectedNode `json:"connected"`
 }
 
-// readLiveNodeState runs the CLI reads behind the "Right now" card. It's
-// the single source of that state, shared by the initial page render and
-// the SSE poller so the two can never drift.
-func (s *Server) readLiveNodeState(ctx context.Context, number string) liveNodeState {
-	var st liveNodeState
+// snapshotNode reads everything the live stream pushes in one pass: the
+// "Right now" state, and the two connection-history tables rendered to
+// an HTML fragment. It's the single source for both, shared by the SSE
+// poller and the initial-on-connect snapshot so they can't drift.
+//
+// It also records the reading into the rolling history (record is
+// deduped on the connected set, so this is what makes the history table
+// update live while someone is watching — the same buffer the slower
+// background poller fills while nobody is).
+func (s *Server) snapshotNode(ctx context.Context, number string) (liveNodeState, string) {
+	var live liveNodeState
 	if out, err := system.AsteriskRX(ctx, s.asteriskBin, "rpt stats "+number); err == nil {
 		fields, _ := parseRptStats(out)
-		st.Receiving = nodeReceiving(fields)
-		st.SignalOnInput = fields.Value("Signal on input")
+		live.Receiving = nodeReceiving(fields)
+		live.SignalOnInput = fields.Value("Signal on input")
 	}
-	if out, err := system.AsteriskRX(ctx, s.asteriskBin, "rpt nodes "+number); err == nil {
-		for _, num := range parseConnectedNodes(out) {
-			st.Connected = append(st.Connected, describeNode(s.nodes, num))
-		}
+
+	nodesOut, _ := system.AsteriskRX(ctx, s.asteriskBin, "rpt nodes "+number)
+	for _, num := range parseConnectedNodes(nodesOut) {
+		live.Connected = append(live.Connected, describeNode(s.nodes, num))
 	}
-	s.markKeyed(ctx, number, st.Connected)
-	return st
+	s.markKeyed(ctx, number, live.Connected)
+
+	activityOut, _ := system.AsteriskRX(ctx, s.asteriskBin, "rpt lstats "+number)
+	s.history.record(number, nodesOut, activityOut)
+
+	q := nodeQuickStatus{Node: &config.Node{Number: number}}
+	q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.nodes, s.history.forNode(number))
+	return live, s.renderHistoryFragment(q)
+}
+
+// renderHistoryFragment renders the node_history partial to a string, so
+// the client can swap it into the history card without this app
+// duplicating the table markup in JavaScript. Any render error yields an
+// empty string, which the client treats as "no update" rather than
+// blanking the card.
+func (s *Server) renderHistoryFragment(q nodeQuickStatus) string {
+	t := s.tmpl["home.html"]
+	if t == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, "node_history", q); err != nil {
+		return ""
+	}
+	return buf.String()
 }
 
 // markKeyed flags which of connected are transmitting right now, from
@@ -76,22 +107,30 @@ func (s *Server) markKeyed(ctx context.Context, number string, connected []conne
 	}
 }
 
+// sseMessage is one named Server-Sent Event: an event name ("live" or
+// "history") and its already-serialized data.
+type sseMessage struct {
+	event string
+	data  []byte
+}
+
 // liveHub fans out per-node live state to any number of connected
 // browsers over SSE. One background poller runs per node that has at
-// least one subscriber; it broadcasts only when the state actually
-// changes, so an idle node produces no traffic beyond keepalives.
+// least one subscriber; it broadcasts an event only when that part of
+// the state actually changes, so an idle node produces no traffic beyond
+// keepalives.
 type liveHub struct {
 	server *Server
 
 	mu       sync.Mutex
-	channels map[string]map[chan []byte]struct{}
+	channels map[string]map[chan sseMessage]struct{}
 	stops    map[string]chan struct{}
 }
 
 func newLiveHub(s *Server) *liveHub {
 	return &liveHub{
 		server:   s,
-		channels: make(map[string]map[chan []byte]struct{}),
+		channels: make(map[string]map[chan sseMessage]struct{}),
 		stops:    make(map[string]chan struct{}),
 	}
 }
@@ -100,12 +139,12 @@ func newLiveHub(s *Server) *liveHub {
 // an unsubscribe func. The first subscriber for a node starts its
 // poller. The channel is buffered and lossy on the sending side (see
 // broadcast), so a slow reader can't stall the poller or other clients.
-func (h *liveHub) subscribe(node string) (<-chan []byte, func()) {
-	ch := make(chan []byte, 4)
+func (h *liveHub) subscribe(node string) (<-chan sseMessage, func()) {
+	ch := make(chan sseMessage, 8)
 	h.mu.Lock()
 	subs := h.channels[node]
 	if subs == nil {
-		subs = make(map[chan []byte]struct{})
+		subs = make(map[chan sseMessage]struct{})
 		h.channels[node] = subs
 		stop := make(chan struct{})
 		h.stops[node] = stop
@@ -116,7 +155,7 @@ func (h *liveHub) subscribe(node string) (<-chan []byte, func()) {
 	return ch, func() { h.unsubscribe(node, ch) }
 }
 
-func (h *liveHub) unsubscribe(node string, ch chan []byte) {
+func (h *liveHub) unsubscribe(node string, ch chan sseMessage) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	subs := h.channels[node]
@@ -136,43 +175,46 @@ func (h *liveHub) unsubscribe(node string, ch chan []byte) {
 	}
 }
 
-// broadcast delivers payload to every subscriber of node, dropping it for
-// any whose buffer is full rather than blocking — a stalled client falls
+// broadcast delivers msg to every subscriber of node, dropping it for any
+// whose buffer is full rather than blocking — a stalled client falls
 // behind and catches up on the next change, never holding up the rest.
-func (h *liveHub) broadcast(node string, payload []byte) {
+func (h *liveHub) broadcast(node string, msg sseMessage) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for ch := range h.channels[node] {
 		select {
-		case ch <- payload:
+		case ch <- msg:
 		default:
 		}
 	}
 }
 
-// poll re-reads node's live state on an interval and broadcasts it when
-// it differs from the last, until stop is closed (the last subscriber
-// left). Deduping on the serialized state is what keeps an idle node
-// silent: connection timers aren't in this payload, so it only changes
-// on a real event (keyup, connect, disconnect).
+// poll re-reads node's state on an interval and broadcasts the "live" and
+// "history" events independently, each only when its own serialized form
+// changes, until stop is closed (the last subscriber left).
+//
+// The two are deduped separately on purpose: live state changes on every
+// keyup, but the history tables change only when the connected set does,
+// so the heavier history fragment isn't re-sent (or re-rendered by the
+// browser) just because someone keyed up.
 func (h *liveHub) poll(node string, stop chan struct{}) {
 	ticker := time.NewTicker(livePollInterval)
 	defer ticker.Stop()
 
-	var last string
+	var lastLive, lastHistory string
 	tick := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), liveFetchTimeout)
-		st := h.server.readLiveNodeState(ctx, node)
+		live, historyHTML := h.server.snapshotNode(ctx, node)
 		cancel()
-		b, err := json.Marshal(st)
-		if err != nil {
-			return
+
+		if b, err := json.Marshal(live); err == nil && string(b) != lastLive {
+			lastLive = string(b)
+			h.broadcast(node, sseMessage{event: "live", data: b})
 		}
-		if string(b) == last {
-			return
+		if b, err := json.Marshal(historyHTML); err == nil && string(b) != lastHistory {
+			lastHistory = string(b)
+			h.broadcast(node, sseMessage{event: "history", data: b})
 		}
-		last = string(b)
-		h.broadcast(node, b)
 	}
 
 	for {
@@ -214,21 +256,26 @@ func (s *Server) handleNodeLive(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	writeState := func(b []byte) bool {
-		if _, err := fmt.Fprintf(w, "data: %s\n\n", b); err != nil {
+	writeEvent := func(msg sseMessage) bool {
+		if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", msg.event, msg.data); err != nil {
 			return false
 		}
 		flusher.Flush()
 		return true
 	}
 
-	// Immediate snapshot, so a freshly-connected client isn't blank until
-	// the poller happens to see a change.
+	// Immediate snapshot of both events, so a freshly-connected client
+	// isn't blank until the poller happens to see a change.
 	initCtx, cancel := context.WithTimeout(ctx, liveFetchTimeout)
-	initial := s.readLiveNodeState(initCtx, number)
+	live, historyHTML := s.snapshotNode(initCtx, number)
 	cancel()
-	if b, err := json.Marshal(initial); err == nil {
-		if !writeState(b) {
+	if b, err := json.Marshal(live); err == nil {
+		if !writeEvent(sseMessage{event: "live", data: b}) {
+			return
+		}
+	}
+	if b, err := json.Marshal(historyHTML); err == nil {
+		if !writeEvent(sseMessage{event: "history", data: b}) {
 			return
 		}
 	}
@@ -243,11 +290,11 @@ func (s *Server) handleNodeLive(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			return
-		case b, ok := <-ch:
+		case msg, ok := <-ch:
 			if !ok {
 				return
 			}
-			if !writeState(b) {
+			if !writeEvent(msg) {
 				return
 			}
 		case <-keepalive.C:
