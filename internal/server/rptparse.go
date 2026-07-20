@@ -1,6 +1,9 @@
 package server
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Parsing for app_rpt's own "rpt nodes" / "rpt lstats" CLI output.
 //
@@ -192,6 +195,55 @@ func parseConnectedNodes(out string) []string {
 		}
 	}
 	return nodes
+}
+
+// rptAlinksRe extracts the RPT_ALINKS value from "rpt show variables"
+// output. It's tolerant of how the command frames the variable (=, :, or
+// whitespace) because the value itself contains no spaces, so it can't
+// over-capture.
+var rptAlinksRe = regexp.MustCompile(`RPT_ALINKS[=:\s]+(\S+)`)
+
+// alinkEntryRe matches one adjacent-node entry: digits, a mode letter,
+// and a keyed letter, e.g. "2001RK". Anything not of this exact shape is
+// skipped rather than guessed at.
+var alinkEntryRe = regexp.MustCompile(`^([0-9]+)([A-Za-z])([A-Za-z])$`)
+
+// keyedNodes returns the set of adjacent node numbers currently keyed
+// (transmitting), read from app_rpt's RPT_ALINKS channel variable in
+// "rpt show variables" output.
+//
+// RPT_ALINKS is documented as:
+//
+//	<count>,<node><mode><rxkeyed>[,<node><mode><rxkeyed>...]
+//
+// e.g. "2,2000TU,2001RK" — two adjacent nodes, 2000 in Transceive mode
+// and unkeyed (U), 2001 in Receive-only mode and keyed (K). The trailing
+// letter is what answers "who's talking".
+//
+// This is built to fail closed. The value grammar is matched strictly,
+// and output with no recognizable RPT_ALINKS yields an empty set — so on
+// an app_rpt build that doesn't expose this variable (or where "rpt show
+// variables" doesn't exist at all, which is unverified on the HamVoIP
+// 0.327 build this was written against), the UI simply shows no talking
+// markers rather than anything incorrect.
+func keyedNodes(out string) map[string]bool {
+	set := map[string]bool{}
+	m := rptAlinksRe.FindStringSubmatch(out)
+	if m == nil {
+		return set
+	}
+	parts := strings.Split(m[1], ",")
+	// parts[0] is the adjacent-node count; the entries follow it.
+	for _, p := range parts[1:] {
+		g := alinkEntryRe.FindStringSubmatch(p)
+		if g == nil {
+			continue
+		}
+		if strings.EqualFold(g[3], "K") {
+			set[g[1]] = true
+		}
+	}
+	return set
 }
 
 // nodeReceiving reports whether someone is keying this node's receiver

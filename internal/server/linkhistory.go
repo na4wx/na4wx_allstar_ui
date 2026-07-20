@@ -125,6 +125,12 @@ type connectedNode struct {
 	Number   string
 	Callsign string
 	Detail   string
+
+	// Keyed is set only on the live "connected right now" list, when
+	// app_rpt's RPT_ALINKS reports this adjacent node as transmitting
+	// (see keyedNodes). It is never set on historical records, which
+	// have no live keyed state to report.
+	Keyed bool
 }
 
 // connectedRecord is one row of the home page's "Connected nodes"

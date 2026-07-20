@@ -109,3 +109,53 @@ func TestNodeReceiving(t *testing.T) {
 		t.Error("Signal on input YES should read as receiving")
 	}
 }
+
+// TestKeyedNodesDocumentedExample uses the exact RPT_ALINKS example from
+// AllStarLink's Event Management documentation: node 2001 is keyed (K),
+// node 2000 is not (U).
+func TestKeyedNodesDocumentedExample(t *testing.T) {
+	out := "Node 52829 variables:\nRPT_ALINKS=2,2000TU,2001RK\nRPT_NUMALINKS=2\n"
+	keyed := keyedNodes(out)
+	if !keyed["2001"] {
+		t.Error("2001 has flag K and should read as keyed")
+	}
+	if keyed["2000"] {
+		t.Error("2000 has flag U and should not read as keyed")
+	}
+	if len(keyed) != 1 {
+		t.Errorf("keyed set = %v, want just {2001}", keyed)
+	}
+}
+
+// TestKeyedNodesToleratesLayout confirms the value is found regardless of
+// whether the command separates the name with =, :, or whitespace, since
+// the exact "rpt show variables" layout on this build is unverified.
+func TestKeyedNodesToleratesLayout(t *testing.T) {
+	for _, out := range []string{
+		"RPT_ALINKS=1,3000TK",
+		"RPT_ALINKS: 1,3000TK",
+		"  RPT_ALINKS   1,3000TK  ",
+	} {
+		if !keyedNodes(out)["3000"] {
+			t.Errorf("did not find keyed node in %q", out)
+		}
+	}
+}
+
+// TestKeyedNodesFailsClosed is the safety contract: no RPT_ALINKS, an
+// empty list, or a value that doesn't fit the grammar must yield an empty
+// set, never a wrong guess — so a build lacking this variable shows no
+// talking markers rather than misleading ones.
+func TestKeyedNodesFailsClosed(t *testing.T) {
+	for _, out := range []string{
+		"",
+		"No such command 'rpt show variables'",
+		"RPT_ALINKS=0",
+		"RPT_ALINKS=garbage-without-grammar",
+		"RPT_RXKEYED=1\nRPT_TXKEYED=0",
+	} {
+		if n := len(keyedNodes(out)); n != 0 {
+			t.Errorf("expected empty set for %q, got %d", out, n)
+		}
+	}
+}
