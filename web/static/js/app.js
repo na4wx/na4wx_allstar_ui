@@ -34,12 +34,16 @@
   setInterval(poll, 4000);
 })();
 
-// Live "Right now" card: subscribes to a per-node Server-Sent Events
-// stream and updates the on-air pill, the connected-node chips (with
-// "talking" markers), and the "Signal on input" cell as state changes —
-// no page reload. Progressive enhancement: the card is already rendered
-// server-side, so if EventSource is unavailable or a proxy blocks the
-// stream, the static snapshot simply stays put. DOM is built with
+// Live node data: subscribes to a per-node Server-Sent Events stream and
+// updates whichever pieces are present on the current page — Home's
+// on-air pill and connected-node chips (with "talking" markers), and/or
+// Stats's "Signal on input" cell and connection-history tables — as
+// state changes, no page reload. Each element is looked up with
+// querySelector and simply skipped if the page doesn't have it, so the
+// same script serves both pages without knowing which one it's on.
+// Progressive enhancement: every card is already rendered server-side,
+// so if EventSource is unavailable or a proxy blocks the stream, the
+// static snapshot simply stays put. DOM is built with
 // textContent/createElement so callsign/description text from the node
 // directory can never inject markup.
 (function () {
@@ -104,8 +108,12 @@
     const signalCell = card.querySelector("[data-live-signal]");
     const indicator = card.querySelector("[data-live-indicator]");
 
+    // Scoped by node number, not just presence: with more than one node
+    // configured, an unscoped querySelector would find whichever history
+    // box happens to be first in the document and every node's stream
+    // would write into it instead of its own.
     const historyBox = document.querySelector(
-      '[data-live-history]'
+      '[data-live-history="' + CSS.escape(node) + '"]'
     );
 
     const es = new EventSource("/nodes/" + encodeURIComponent(node) + "/live", {

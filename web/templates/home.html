@@ -1,6 +1,5 @@
 {{define "title"}}Home{{end}}
 {{define "content"}}
-<h1>Home</h1>
 
 {{if .Quick}}
 {{range .Quick}}
@@ -22,7 +21,7 @@
   <div class="live-head">
     <div class="label-row">
       <h2 style="margin:0">Right now — node {{.Node.Number}}</h2>
-      {{template "help" "Live state from app_rpt, pushed to this page as it changes (no reload needed). \"On the air\" means someone is keying this node's local receiver over the radio right now — audio arriving from a linked node over the internet does not set that flag. A connected node marked \"talking\" is a linked station currently transmitting, read from app_rpt's RPT_ALINKS; not every app_rpt build reports this, and where it isn't reported no talking markers appear."}}
+      {{template "help" "Live state from app_rpt, pushed to this page as it changes (no reload needed). \"On the air\" means someone is keying this node's local receiver over the radio right now — audio arriving from a linked node over the internet does not set that flag. A connected node marked \"talking\" is a linked station currently transmitting, read from app_rpt's RPT_ALINKS; not every app_rpt build reports this, and where it isn't reported no talking markers appear. Detailed field-by-field stats and connection history are on the Stats page."}}
       <span class="live-dot" data-live-indicator title="Live — updating as state changes"></span>
     </div>
     <span data-live-pill>
@@ -34,7 +33,7 @@
     </span>
   </div>
 
-  <div class="field">
+  <div class="field" style="margin-bottom:0">
     <label>Connected right now</label>
     <div data-live-connected>
     {{if .NowConnected}}
@@ -44,32 +43,12 @@
     {{end}}
     </div>
   </div>
-
-  {{if .StatsErr}}
-  <p class="hint">Could not read live status: {{.StatsErr}}</p>
-  {{else if .StatsOK}}
-  <div class="table-scroll">
-    <table class="data-table stats-table">
-      <tbody>
-        {{range .Stats}}
-        <tr><th scope="row">{{.Label}}</th><td{{if eq .Label "Signal on input"}} data-live-signal{{end}}>{{.Value}}</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  {{else if .StatsRaw}}
-  <pre class="raw-block">{{.StatsRaw}}</pre>
-  {{end}}
-</div>
-
-<div class="card" data-live-history>
-  {{template "node_history" .}}
 </div>
 
 <div class="card">
   <div class="label-row">
     <h2 style="margin:0">Connect node {{.Node.Number}} to another node</h2>
-    {{template "help" "Sends the standard AllStarLink touch-tone command to link (*3) or unlink (*1) — the same thing you'd key in over the air, without needing a radio in your hand. The result shows up in the tables above once the connection changes."}}
+    {{template "help" "Sends the standard AllStarLink touch-tone command to link (*3) or unlink (*1) — the same thing you'd key in over the air, without needing a radio in your hand. The result shows up in the card above once the connection changes, and in more detail on the Stats page."}}
   </div>
   <form method="post" action="/nodes/{{.Node.Number}}/link" data-ajax-link data-confirm="Send this link/unlink command to node {{.Node.Number}} now?">
     <div class="row">
@@ -88,29 +67,9 @@
 </div>
 {{end}}
 <div class="card">
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
-    <h2 style="margin:0">System status</h2>
-    <span class="status-pill" data-status-pill><span class="dot"></span><span class="label">Checking…</span></span>
-  </div>
-  <div class="stat-grid">
-    <div class="stat">
-      <div class="label">Hostname</div>
-      <div class="value" data-hostname>{{.Status.Hostname}}</div>
-    </div>
-    <div class="stat">
-      <div class="label">Uptime</div>
-      <div class="value" data-uptime>{{.Status.Uptime}}</div>
-    </div>
-    <div class="stat">
-      <div class="label">Configured nodes</div>
-      <div class="value">{{len .Nodes}}</div>
-    </div>
-  </div>
-</div>
-
-<div class="card">
   <div class="actions" style="margin-top:0">
     <a class="btn primary" href="/nodes/new">Add node</a>
+    <a class="btn" href="/stats">View detailed stats &amp; history</a>
     <form method="post" action="/nodes/sync-extensions" style="display:inline">
       <button type="submit" class="btn">Sync dialplan entries for all nodes</button>
     </form>

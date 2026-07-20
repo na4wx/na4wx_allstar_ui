@@ -79,7 +79,7 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 }
 
 func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
-	pages := []string{"setup.html", "login.html", "home.html", "node_new.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
+	pages := []string{"setup.html", "login.html", "home.html", "stats.html", "node_new.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
 	out := map[string]*template.Template{}
 	for _, page := range pages {
 		// radio_device_fields.html is a shared partial ({{template
@@ -109,6 +109,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /logout", s.requireAuth(s.handleLogout))
 
 	s.mux.HandleFunc("GET /{$}", s.requireAuth(s.handleHome))
+	s.mux.HandleFunc("GET /stats", s.requireAuth(s.handleStats))
 	s.mux.HandleFunc("GET /api/status", s.requireAuth(s.handleAPIStatus))
 
 	// Node pages: the one-stop shop for a node's identity, radio

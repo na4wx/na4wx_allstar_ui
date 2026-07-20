@@ -106,19 +106,62 @@ type homePageData struct {
 	Quick  []nodeQuickStatus
 }
 
-// handleHome is the sole landing page: system status plus one card per
-// configured node with live status, quick link/unlink, and (absorbed
-// from what used to be a separate Nodes list page) links into each
-// node's full configuration.
+// handleHome is the sole landing page: one card per configured node with
+// live on-air/connected status, quick link/unlink, and (absorbed from
+// what used to be a separate Nodes list page) links into each node's
+// full configuration. Detailed stats, connection history, and overall
+// system status live on the separate Stats page.
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	s.renderHome(w, r, pageData{LoggedIn: true})
 }
 
 func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData) {
-	numbers, err := s.store.ListNodes()
+	nodes, status, quick, err := s.gatherNodeStatuses(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	s.render(w, "home.html", homePageData{
+		pageData: pd,
+		Nodes:    nodes,
+		Status:   status,
+		Quick:    quick,
+	})
+}
+
+// handleStats is the detailed-status page: overall system status plus,
+// per node, the full rpt-stats field table and connection history —
+// everything Home used to show below its "Right now" card before that
+// content moved here to keep Home to just the live glance and the
+// link/unlink action.
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	s.renderStats(w, r, pageData{LoggedIn: true})
+}
+
+func (s *Server) renderStats(w http.ResponseWriter, r *http.Request, pd pageData) {
+	nodes, status, quick, err := s.gatherNodeStatuses(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.render(w, "stats.html", homePageData{
+		pageData: pd,
+		Nodes:    nodes,
+		Status:   status,
+		Quick:    quick,
+	})
+}
+
+// gatherNodeStatuses reads everything Home and Stats both need: every
+// configured node, overall system status, and each node's quick status
+// (connected nodes, link activity, live stats, and connection history).
+// Shared so the two pages can't drift on what a "current reading" means,
+// and so this — the most CLI-call-heavy read in the app — is written
+// once.
+func (s *Server) gatherNodeStatuses(r *http.Request) ([]*config.Node, system.Status, []nodeQuickStatus, error) {
+	numbers, err := s.store.ListNodes()
+	if err != nil {
+		return nil, system.Status{}, nil, err
 	}
 	var nodes []*config.Node
 	for _, n := range numbers {
@@ -157,7 +200,8 @@ func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData)
 		}
 		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.nodes, s.history.forNode(node.Number))
 
-		// Live state, for the card at the top of this node's block.
+		// Live state, for Home's "Right now" card and the Stats page's
+		// detailed field table.
 		if out, err := system.AsteriskRX(r.Context(), s.asteriskBin, "rpt stats "+node.Number); err != nil {
 			q.StatsErr = err.Error()
 		} else {
@@ -176,12 +220,7 @@ func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData)
 		quick = append(quick, q)
 	}
 
-	s.render(w, "home.html", homePageData{
-		pageData: pd,
-		Nodes:    nodes,
-		Status:   status,
-		Quick:    quick,
-	})
+	return nodes, status, quick, nil
 }
 
 // handleNodesSyncExtensions is the bulk counterpart to the per-node
