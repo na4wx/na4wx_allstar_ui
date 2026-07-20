@@ -232,6 +232,87 @@ func (s *Store) CloneNodeConfig(srcNumber, dstNumber string) error {
 	return s.save(RptConfFile, f)
 }
 
+// NormalizeNodeConfig makes number self-contained: for each of its
+// functions/macro/telemetry/morse fields, if the section it points at
+// isn't this app's own <prefix><number> name, that section's contents
+// are copied into a correctly-named one and the field is repointed
+// there.
+//
+// This repairs a node set up by hand or by HamVoIP's node-config.sh —
+// the classic case being one whose [52829] section still points at
+// functions1998 because only the section header was renamed from the
+// shipped template, leaving the node borrowing another (possibly
+// nonexistent) node's command set. After this runs, the node owns
+// sections named for itself, so editing or deleting it through this app
+// affects only its own config.
+//
+// A blank field is treated as pointing at app_rpt's bare fallback name
+// (e.g. "functions"), which is normalized the same way — that bare
+// section usually doesn't exist on a stock install, so the result is an
+// empty but correctly-named section the operator can then fill via the
+// command list.
+//
+// Section contents are copied verbatim. Command or telemetry values that
+// embed a node number as a literal argument (e.g. a saytime script call)
+// are deliberately NOT rewritten: blindly substituting a number inside
+// an arbitrary command could corrupt a value that legitimately refers to
+// a different node. The old source sections are left in place, since
+// they may be shared with another node and removing them safely needs a
+// cross-node check this method can't make on its own.
+//
+// Returns the fields that were changed (e.g. "functions", "morse"), so
+// the caller can tell the operator whether anything actually needed
+// repair. A node already using correctly-named sections yields an empty
+// list and no write.
+func (s *Store) NormalizeNodeConfig(number string) ([]string, error) {
+	if number == "" {
+		return nil, fmt.Errorf("config: node number is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, err := s.load(RptConfFile)
+	if err != nil {
+		return nil, err
+	}
+	if !f.HasSection(number) {
+		return nil, fmt.Errorf("config: node %s not found in %s", number, RptConfFile)
+	}
+
+	var changed []string
+	for _, cs := range companionSections {
+		current, _ := f.Get(number, cs.nodeKey)
+		if current == "" {
+			current = cs.defaultName
+		}
+		desired := cs.defaultName + number
+		if current == desired {
+			continue
+		}
+		// Rebuild the correctly-named section from scratch out of the
+		// current one's content (or empty if the source doesn't exist),
+		// then repoint the node at it. current != desired is guaranteed
+		// here, so clearing desired never touches the source.
+		f.DeleteSection(desired)
+		if f.HasSection(current) {
+			for _, kv := range f.SectionKeys(current) {
+				f.Set(desired, kv.Key, kv.Value)
+			}
+		} else {
+			f.EnsureSection(desired)
+		}
+		f.Set(number, cs.nodeKey, desired)
+		changed = append(changed, cs.nodeKey)
+	}
+
+	if len(changed) == 0 {
+		return nil, nil
+	}
+	if err := s.save(RptConfFile, f); err != nil {
+		return nil, err
+	}
+	return changed, nil
+}
+
 // DeleteNode removes a node's [nodes] entry and its per-node section
 // entirely. This does not touch its functions/macro/telemetry/morse
 // companion sections (see CloneNodeConfig) — those might still be

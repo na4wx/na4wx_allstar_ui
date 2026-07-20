@@ -354,6 +354,33 @@ func (s *Server) handleNodeCloneConfig(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
 }
 
+// handleNodeNormalize repairs a node whose command/tone sections are
+// named for a different node — the classic case being one created by
+// renaming the shipped template's [1998] header, which leaves the node
+// pointing at functions1998/morse1998/etc. rather than its own sections.
+// See config.Store.NormalizeNodeConfig for exactly what it does and
+// deliberately doesn't do (it copies verbatim and never rewrites node
+// numbers embedded in command values).
+func (s *Server) handleNodeNormalize(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	changed, err := s.store.NormalizeNodeConfig(number)
+	if err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
+		return
+	}
+	if len(changed) == 0 {
+		s.renderNodeEditPage(w, r, number, flash("ok", "Node "+number+" already owns correctly-named command/tone sections — nothing needed repair."))
+		return
+	}
+	msg := "Repaired node " + number + ": " + strings.Join(changed, ", ") +
+		" now use sections named for this node. Any command values that mention another node number by name were copied as-is — review the command list if this node was cloned from a different one. The old sections were left in place; remove them from Raw Config if nothing else uses them."
+	s.renderNodeEditPage(w, r, number, flash("ok", msg))
+}
+
 func (s *Server) handleNodeRegistrationSave(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	if _, err := s.store.LoadNode(number); err != nil {

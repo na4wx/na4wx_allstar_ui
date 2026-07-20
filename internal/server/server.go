@@ -119,6 +119,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/recreate-device", s.requireAuth(s.handleNodeRecreateDevice))
 	s.mux.HandleFunc("POST /nodes/{number}/registration", s.requireAuth(s.handleNodeRegistrationSave))
 	s.mux.HandleFunc("POST /nodes/{number}/clone-config", s.requireAuth(s.handleNodeCloneConfig))
+	s.mux.HandleFunc("POST /nodes/{number}/normalize", s.requireAuth(s.handleNodeNormalize))
 	s.mux.HandleFunc("POST /nodes/{number}/macros", s.requireAuth(s.handleNodeMacroSave))
 	s.mux.HandleFunc("POST /nodes/{number}/macros/{digits}/delete", s.requireAuth(s.handleNodeMacroDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/macrodefs", s.requireAuth(s.handleNodeMacroDefSave))

@@ -183,6 +183,15 @@
       </div>
     </div>
 
+    <div class="field">
+      <div class="label-row">
+        <label>Repair section names</label>
+        {{template "help" "Use this if this node was set up by editing HamVoIP's shipped template — its sections may still be named for the template's example node (e.g. functions1998) instead of this one, which means editing or deleting this node here can miss them. Repair copies each set into a section named for this node and points the node at it. It keeps your current commands and tones; it only fixes the names. Safe to run any time — it does nothing if the names are already correct."}}
+      </div>
+      <div class="hint">Fixes a node whose command/tone sections are named for a different node (common if it was set up by hand from the template). Keeps your current settings — only corrects the names.</div>
+      <button type="submit" formaction="/nodes/{{.Node.Number}}/normalize" formnovalidate class="btn" style="margin-top:0.5rem" onclick="return confirm('Repair node {{.Node.Number}}\'s command/tone section names? This copies its current commands and tones into sections named for this node. Your settings are kept; only the section names change.')">Repair section names</button>
+    </div>
+
     <details style="margin-top:1rem">
       <summary style="cursor:pointer; color:var(--text-dim); font-size:0.9rem;">Advanced: set section names manually</summary>
       <div class="row" style="margin-top:0.75rem">
