@@ -241,17 +241,23 @@
     <div class="row">
       <div class="field">
         <div class="label-row">
-          <label for="sa818_tx_ctcss">Transmit CTCSS code</label>
-          {{template "help" "The module's own hardware CTCSS code, if you want the module itself (rather than the software on this page's Radio tab) to encode a tone. This is NOT the same as the Hz-based tone list on the Radio page, and the code-to-Hz mapping for this module isn't independently verified here — most SHARI USB setups leave this at 0000 (no tone) and let the software handle CTCSS instead."}}
+          <label for="sa818_tx_ctcss">Transmit CTCSS tone</label>
+          {{template "help" "Programs the module's own hardware to encode this tone on transmit, so other stations/repeaters requiring a PL tone will open for you. Pick by frequency — the module's underlying numeric code is set automatically. Leave at \"No tone\" unless you know your repeater requires one."}}
         </div>
-        <input type="text" id="sa818_tx_ctcss" name="tx_ctcss" value="{{if $last}}{{$last.TxCTCSS}}{{end}}" placeholder="0000">
+        <select id="sa818_tx_ctcss" name="tx_ctcss">
+          <option value="0000" {{if or (not $last) (eq $last.TxCTCSS "0000") (eq $last.TxCTCSS "")}}selected{{end}}>No tone (0000)</option>
+          {{range $.CTCSSOptions}}<option value="{{.Code}}" {{if and $last (eq $last.TxCTCSS .Code)}}selected{{end}}>{{.Hz}} Hz</option>{{end}}
+        </select>
       </div>
       <div class="field">
         <div class="label-row">
-          <label for="sa818_rx_ctcss">Receive CTCSS code</label>
-          {{template "help" "Same caveat as transmit CTCSS code — leave at 0000 unless you specifically know the code your module needs."}}
+          <label for="sa818_rx_ctcss">Receive CTCSS tone</label>
+          {{template "help" "Programs the module itself to require this tone before it reports a valid signal — a real hardware squelch gate, separate from any software CTCSS setting elsewhere in this app. Setting this (instead of leaving it at \"No tone\") is what stops the module's own squelch-tail noise burst from being mistaken for a valid signal and re-triggering the transmitter."}}
         </div>
-        <input type="text" id="sa818_rx_ctcss" name="rx_ctcss" value="{{if $last}}{{$last.RxCTCSS}}{{end}}" placeholder="0000">
+        <select id="sa818_rx_ctcss" name="rx_ctcss">
+          <option value="0000" {{if or (not $last) (eq $last.RxCTCSS "0000") (eq $last.RxCTCSS "")}}selected{{end}}>No tone (0000)</option>
+          {{range $.CTCSSOptions}}<option value="{{.Code}}" {{if and $last (eq $last.RxCTCSS .Code)}}selected{{end}}>{{.Hz}} Hz</option>{{end}}
+        </select>
       </div>
     </div>
     <div class="row">

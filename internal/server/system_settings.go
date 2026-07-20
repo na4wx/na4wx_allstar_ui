@@ -36,6 +36,7 @@ type systemPageData struct {
 	RadioDevices    []radioDeviceRef
 	SA818Tool       string
 	SA818Last       *sa818.LastApplied
+	CTCSSOptions    []ctcssOption
 
 	// EmptyRadioFiles lists usbradio.conf/simpleusb.conf files with zero
 	// devices defined at all, regardless of whether any node actually
@@ -105,6 +106,7 @@ func (s *Server) renderSystemPage(w http.ResponseWriter, r *http.Request, pd pag
 			data.SA818Last = last
 		}
 	}
+	data.CTCSSOptions = ctcssOptions()
 
 	s.render(w, "system.html", data)
 }

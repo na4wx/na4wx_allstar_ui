@@ -9,6 +9,28 @@ import (
 	"hamvoipconfiggui/internal/sa818"
 )
 
+// ctcssOption is one entry in the CTCSS dropdowns: the module's own
+// 4-digit code paired with the Hz value it's labeled with, so the form
+// can show "100.0 Hz" while submitting "0012" — matching what the
+// module's own manual documents as its Tx_CTCSS/Rx_CTCSS index, not a
+// generic CTCSS tone table (see sa818.CTCSSTones).
+type ctcssOption struct {
+	Code string
+	Hz   string
+}
+
+// ctcssOptions lists every tone the module accepts, code-and-Hz paired,
+// for the dropdowns. Built fresh each render rather than a package-level
+// var since it's cheap (38 entries) and this keeps sa818.CTCSSTones as
+// the single source of truth.
+func ctcssOptions() []ctcssOption {
+	opts := make([]ctcssOption, len(sa818.CTCSSTones))
+	for i, hz := range sa818.CTCSSTones {
+		opts[i] = ctcssOption{Code: sa818.CTCSSCode(hz), Hz: hz}
+	}
+	return opts
+}
+
 // sa818SettingsFromForm builds a sa818.Settings from the submitted
 // form, applying the same corrections identified from a real failed
 // 818-prog run on production hardware: frequencies need all four
@@ -41,9 +63,15 @@ func sa818SettingsFromForm(r *http.Request) (sa818.Settings, string) {
 	if s.TxCTCSS == "" {
 		s.TxCTCSS = "0000"
 	}
+	if !sa818.ValidCTCSSCode(s.TxCTCSS) {
+		return s, "Transmit CTCSS: not a value from the tone list"
+	}
 	s.RxCTCSS = strings.TrimSpace(r.FormValue("rx_ctcss"))
 	if s.RxCTCSS == "" {
 		s.RxCTCSS = "0000"
+	}
+	if !sa818.ValidCTCSSCode(s.RxCTCSS) {
+		return s, "Receive CTCSS: not a value from the tone list"
 	}
 
 	squelch, err := strconv.Atoi(r.FormValue("squelch"))
