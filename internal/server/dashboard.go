@@ -168,20 +168,10 @@ func (s *Server) renderHome(w http.ResponseWriter, r *http.Request, pd pageData)
 		for _, number := range parseConnectedNodes(q.Connected) {
 			q.NowConnected = append(q.NowConnected, describeNode(s.nodes, number))
 		}
-		// Mark which connected nodes are keying right now, from
-		// RPT_ALINKS. Best-effort and purely additive: if this app_rpt
-		// build doesn't expose the variable, keyedNodes returns nothing
-		// and the chips just render without a talking marker.
-		if len(q.NowConnected) > 0 {
-			if out, err := system.AsteriskRX(r.Context(), s.asteriskBin, "rpt show variables "+node.Number); err == nil {
-				keyed := keyedNodes(out)
-				for i := range q.NowConnected {
-					if keyed[q.NowConnected[i].Number] {
-						q.NowConnected[i].Keyed = true
-					}
-				}
-			}
-		}
+		// Mark which connected nodes are keying right now (RPT_ALINKS) —
+		// the same live read the SSE stream uses, so the page-load
+		// snapshot and the first pushed update agree.
+		s.markKeyed(r.Context(), node.Number, q.NowConnected)
 
 		quick = append(quick, q)
 	}

@@ -275,6 +275,29 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   font-variant-numeric: tabular-nums;
 }
 
+/* A small dot next to the "Right now" title that lights while the SSE
+   stream is connected, so the "live, no reload" claim is visible. Grey
+   until the first event arrives (or while the stream is down). */
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.live-dot.on {
+  background: var(--ok);
+  opacity: 1;
+  animation: live-breathe 2s ease-in-out infinite;
+}
+@keyframes live-breathe {
+  50% { opacity: 0.4; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot.on { animation: none; }
+}
+
 /* Live-status card heading: title on the left, on-air pill on the
    right, wrapping instead of colliding on a narrow screen. */
 .live-head {

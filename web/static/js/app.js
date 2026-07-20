@@ -34,6 +34,101 @@
   setInterval(poll, 4000);
 })();
 
+// Live "Right now" card: subscribes to a per-node Server-Sent Events
+// stream and updates the on-air pill, the connected-node chips (with
+// "talking" markers), and the "Signal on input" cell as state changes —
+// no page reload. Progressive enhancement: the card is already rendered
+// server-side, so if EventSource is unavailable or a proxy blocks the
+// stream, the static snapshot simply stays put. DOM is built with
+// textContent/createElement so callsign/description text from the node
+// directory can never inject markup.
+(function () {
+  const cards = document.querySelectorAll("[data-live-node]");
+  if (!cards.length || typeof EventSource === "undefined") return;
+
+  function renderPill(container, receiving) {
+    const pill = document.createElement("span");
+    pill.className = "status-pill " + (receiving ? "down" : "up");
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    pill.appendChild(dot);
+    pill.appendChild(
+      document.createTextNode(
+        receiving ? "On the air — signal on input" : "Idle — no signal on input"
+      )
+    );
+    container.replaceChildren(pill);
+  }
+
+  function renderConnected(container, connected) {
+    if (!connected || !connected.length) {
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = "Nothing connected.";
+      container.replaceChildren(hint);
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    connected.forEach((n) => {
+      const chip = document.createElement("span");
+      chip.className = "node-chip" + (n.keyed ? " keyed" : "");
+      if (n.detail) chip.title = n.detail;
+
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = n.number;
+      chip.appendChild(tag);
+
+      if (n.callsign) {
+        const call = document.createElement("span");
+        call.className = "node-call";
+        call.textContent = n.callsign;
+        chip.appendChild(call);
+      }
+      if (n.keyed) {
+        const badge = document.createElement("span");
+        badge.className = "talking-badge";
+        badge.textContent = "talking";
+        chip.appendChild(badge);
+      }
+      frag.appendChild(chip);
+      frag.appendChild(document.createTextNode(" "));
+    });
+    container.replaceChildren(frag);
+  }
+
+  cards.forEach((card) => {
+    const node = card.getAttribute("data-live-node");
+    const pillBox = card.querySelector("[data-live-pill]");
+    const connBox = card.querySelector("[data-live-connected]");
+    const signalCell = card.querySelector("[data-live-signal]");
+    const indicator = card.querySelector("[data-live-indicator]");
+
+    const es = new EventSource("/nodes/" + encodeURIComponent(node) + "/live", {
+      withCredentials: true,
+    });
+
+    es.onmessage = (ev) => {
+      let s;
+      try {
+        s = JSON.parse(ev.data);
+      } catch (e) {
+        return;
+      }
+      if (indicator) indicator.classList.add("on");
+      if (pillBox) renderPill(pillBox, s.receiving);
+      if (connBox) renderConnected(connBox, s.connected);
+      if (signalCell && s.signalOnInput) signalCell.textContent = s.signalOnInput;
+    };
+
+    es.onerror = () => {
+      // EventSource retries on its own; just dim the live indicator while
+      // the connection is down so the card doesn't look falsely live.
+      if (indicator) indicator.classList.remove("on");
+    };
+  });
+})();
+
 // Node page "radio hardware" toggle: shows either the existing-device
 // picker or the create-a-new-device sub-form depending on which radio
 // button is selected, so both stay in the same form (one POST covers

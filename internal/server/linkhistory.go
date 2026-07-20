@@ -122,15 +122,15 @@ func whenAgo(at time.Time) (string, string) {
 // the directory (or when no directory has been downloaded), in which
 // case the UI shows the bare number.
 type connectedNode struct {
-	Number   string
-	Callsign string
-	Detail   string
+	Number   string `json:"number"`
+	Callsign string `json:"callsign"`
+	Detail   string `json:"detail"`
 
 	// Keyed is set only on the live "connected right now" list, when
 	// app_rpt's RPT_ALINKS reports this adjacent node as transmitting
 	// (see keyedNodes). It is never set on historical records, which
 	// have no live keyed state to report.
-	Keyed bool
+	Keyed bool `json:"keyed"`
 }
 
 // connectedRecord is one row of the home page's "Connected nodes"

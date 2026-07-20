@@ -18,26 +18,31 @@
   </form>
 </div>
 {{end}}
-<div class="card">
+<div class="card" data-live-node="{{.Node.Number}}">
   <div class="live-head">
     <div class="label-row">
       <h2 style="margin:0">Right now — node {{.Node.Number}}</h2>
-      {{template "help" "Live state from app_rpt, re-read each time this page loads. \"On the air\" means someone is keying this node's local receiver over the radio right now — audio arriving from a linked node over the internet does not set that flag. A connected node marked \"talking\" is a linked station currently transmitting, read from app_rpt's RPT_ALINKS; not every app_rpt build reports this, and where it isn't reported no talking markers appear."}}
+      {{template "help" "Live state from app_rpt, pushed to this page as it changes (no reload needed). \"On the air\" means someone is keying this node's local receiver over the radio right now — audio arriving from a linked node over the internet does not set that flag. A connected node marked \"talking\" is a linked station currently transmitting, read from app_rpt's RPT_ALINKS; not every app_rpt build reports this, and where it isn't reported no talking markers appear."}}
+      <span class="live-dot" data-live-indicator title="Live — updating as state changes"></span>
     </div>
+    <span data-live-pill>
     {{if .Receiving}}
     <span class="status-pill down"><span class="dot"></span>On the air — signal on input</span>
     {{else}}
     <span class="status-pill up"><span class="dot"></span>Idle — no signal on input</span>
     {{end}}
+    </span>
   </div>
 
   <div class="field">
     <label>Connected right now</label>
+    <div data-live-connected>
     {{if .NowConnected}}
       {{range .NowConnected}}<span class="node-chip{{if .Keyed}} keyed{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}><span class="tag">{{.Number}}</span>{{if .Callsign}}<span class="node-call">{{.Callsign}}</span>{{end}}{{if .Keyed}}<span class="talking-badge">talking</span>{{end}}</span> {{end}}
     {{else}}
       <div class="hint">Nothing connected.</div>
     {{end}}
+    </div>
   </div>
 
   {{if .StatsErr}}
@@ -47,7 +52,7 @@
     <table class="data-table stats-table">
       <tbody>
         {{range .Stats}}
-        <tr><th scope="row">{{.Label}}</th><td>{{.Value}}</td></tr>
+        <tr><th scope="row">{{.Label}}</th><td{{if eq .Label "Signal on input"}} data-live-signal{{end}}>{{.Value}}</td></tr>
         {{end}}
       </tbody>
     </table>

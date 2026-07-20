@@ -38,6 +38,10 @@ type Server struct {
 	// a callsign beside a node number. Always non-nil; an empty one just
 	// means numbers render without callsigns.
 	nodes *nodedb.Store
+
+	// live pushes each node's moment-to-moment state to the "Right now"
+	// card over SSE. Always non-nil.
+	live *liveHub
 }
 
 // NodeDB exposes the node directory so main can start its refresh loop.
@@ -62,6 +66,7 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 // is where the last settings sent to it are recorded (see internal/sa818).
 func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL string) (*Server, error) {
 	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL)}
+	s.live = newLiveHub(s)
 
 	tmpl, err := parseTemplates(templatesFS)
 	if err != nil {
@@ -114,6 +119,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes", s.requireAuth(s.handleNodeCreate))
 	s.mux.HandleFunc("POST /nodes/sync-extensions", s.requireAuth(s.handleNodesSyncExtensions))
 	s.mux.HandleFunc("GET /nodes/{number}", s.requireAuth(s.handleNodeEditForm))
+	s.mux.HandleFunc("GET /nodes/{number}/live", s.requireAuth(s.handleNodeLive))
 	s.mux.HandleFunc("POST /nodes/{number}", s.requireAuth(s.handleNodeSave))
 	s.mux.HandleFunc("POST /nodes/{number}/link", s.requireAuth(s.handleNodeLink))
 	s.mux.HandleFunc("POST /nodes/{number}/recreate-device", s.requireAuth(s.handleNodeRecreateDevice))
