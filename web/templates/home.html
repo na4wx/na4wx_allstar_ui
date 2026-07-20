@@ -19,6 +19,45 @@
 </div>
 {{end}}
 <div class="card">
+  <div class="live-head">
+    <div class="label-row">
+      <h2 style="margin:0">Right now — node {{.Node.Number}}</h2>
+      {{template "help" "Live state from app_rpt, re-read each time this page loads. \"On the air\" means someone is keying this node's local receiver over the radio right now — audio arriving from a linked node over the internet does not set that flag. A connected node marked \"talking\" is a linked station currently transmitting, read from app_rpt's RPT_ALINKS; not every app_rpt build reports this, and where it isn't reported no talking markers appear."}}
+    </div>
+    {{if .Receiving}}
+    <span class="status-pill down"><span class="dot"></span>On the air — signal on input</span>
+    {{else}}
+    <span class="status-pill up"><span class="dot"></span>Idle — no signal on input</span>
+    {{end}}
+  </div>
+
+  <div class="field">
+    <label>Connected right now</label>
+    {{if .NowConnected}}
+      {{range .NowConnected}}<span class="node-chip{{if .Keyed}} keyed{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}><span class="tag">{{.Number}}</span>{{if .Callsign}}<span class="node-call">{{.Callsign}}</span>{{end}}{{if .Keyed}}<span class="talking-badge">talking</span>{{end}}</span> {{end}}
+    {{else}}
+      <div class="hint">Nothing connected.</div>
+    {{end}}
+  </div>
+
+  {{if .StatsErr}}
+  <p class="hint">Could not read live status: {{.StatsErr}}</p>
+  {{else if .StatsOK}}
+  <div class="table-scroll">
+    <table class="data-table stats-table">
+      <tbody>
+        {{range .Stats}}
+        <tr><th scope="row">{{.Label}}</th><td>{{.Value}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else if .StatsRaw}}
+  <pre class="raw-block">{{.StatsRaw}}</pre>
+  {{end}}
+</div>
+
+<div class="card">
   <div class="label-row">
     <h2 style="margin:0">Node {{.Node.Number}} history</h2>
     {{template "help" "How this node's connections have changed over time. A new record is kept each time the connected-node list changes, retaining the last 10."}}
@@ -111,45 +150,6 @@
       <button type="submit" name="action" value="unlink">Unlink</button>
     </div>
   </form>
-</div>
-
-<div class="card">
-  <div class="live-head">
-    <div class="label-row">
-      <h2 style="margin:0">Right now — node {{.Node.Number}}</h2>
-      {{template "help" "Live state from app_rpt, re-read each time this page loads. \"On the air\" means someone is keying this node's local receiver over the radio right now — audio arriving from a linked node over the internet does not set that flag. A connected node marked \"talking\" is a linked station currently transmitting, read from app_rpt's RPT_ALINKS; not every app_rpt build reports this, and where it isn't reported no talking markers appear."}}
-    </div>
-    {{if .Receiving}}
-    <span class="status-pill down"><span class="dot"></span>On the air — signal on input</span>
-    {{else}}
-    <span class="status-pill up"><span class="dot"></span>Idle — no signal on input</span>
-    {{end}}
-  </div>
-
-  <div class="field">
-    <label>Connected right now</label>
-    {{if .NowConnected}}
-      {{range .NowConnected}}<span class="node-chip{{if .Keyed}} keyed{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}><span class="tag">{{.Number}}</span>{{if .Callsign}}<span class="node-call">{{.Callsign}}</span>{{end}}{{if .Keyed}}<span class="talking-badge">talking</span>{{end}}</span> {{end}}
-    {{else}}
-      <div class="hint">Nothing connected.</div>
-    {{end}}
-  </div>
-
-  {{if .StatsErr}}
-  <p class="hint">Could not read live status: {{.StatsErr}}</p>
-  {{else if .StatsOK}}
-  <div class="table-scroll">
-    <table class="data-table stats-table">
-      <tbody>
-        {{range .Stats}}
-        <tr><th scope="row">{{.Label}}</th><td>{{.Value}}</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-  {{else if .StatsRaw}}
-  <pre class="raw-block">{{.StatsRaw}}</pre>
-  {{end}}
 </div>
 {{end}}
 <div class="card">
