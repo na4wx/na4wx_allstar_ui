@@ -28,6 +28,9 @@
   <option value="autopatchup">autopatchup — start an autopatch call</option>
   <option value="autopatchdn">autopatchdn — end the autopatch call</option>
 </datalist>
+<datalist id="sound_files">
+  {{range .SoundFiles}}<option value="{{.Ref}}">{{.Ref}}{{if not .Custom}} (built-in){{end}}</option>{{end}}
+</datalist>
 
 <form method="post" action="/nodes/{{.Node.Number}}">
   <div class="card">
@@ -229,9 +232,9 @@
     <div class="field" style="margin-top:1rem">
       <div class="label-row">
         <label for="idrecording">Station ID announcement</label>
-        {{template "help" "The voice or Morse recording that identifies your station by callsign — required periodically by FCC rules. Typically a sound file path, or |i followed by your callsign for a built-in voice."}}
+        {{template "help" "The voice or Morse recording that identifies your station by callsign — required periodically by FCC rules. Typically |i followed by your callsign for a built-in voice, or pick/upload a custom recording in Tones & Audio below."}}
       </div>
-      <input type="text" id="idrecording" name="idrecording" value="{{.Node.IDRecording}}" placeholder="|iyourcallsign or a sound file path">
+      <input type="text" id="idrecording" name="idrecording" value="{{.Node.IDRecording}}" list="sound_files" placeholder="|iyourcallsign or a sound file name">
     </div>
   </div>
 
@@ -243,6 +246,112 @@
   </div>
 </form>
 <form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
+
+<form method="post" action="/nodes/{{.Node.Number}}/telemetry">
+  <div class="card">
+    <div class="label-row">
+      <h2 style="margin:0">Tones &amp; audio ({{.TelemetrySect}})</h2>
+      {{template "help" "Courtesy tones, status beeps, and sound-file playback for this node. Each entry either plays a tone (frequency/duration/amplitude) or a named sound file — app_rpt accepts either in any of these fields, so this shows whichever this entry currently is."}}
+    </div>
+    {{if .TelemetryRows}}
+    <table>
+      <thead><tr><th>Event</th><th>Setting</th></tr></thead>
+      <tbody>
+        {{range .TelemetryRows}}
+        <tr>
+          <td style="white-space:nowrap">{{.Key}}</td>
+          <td>
+            {{if eq .Mode "tone"}}
+            <div class="row" style="margin:0">
+              <div class="field" style="min-width:90px">
+                <label for="tone_{{.Key}}_freq1">Freq 1 (Hz)</label>
+                <input type="number" id="tone_{{.Key}}_freq1" name="tone_{{.Key}}_freq1" value="{{.Tone.Freq1}}">
+              </div>
+              <div class="field" style="min-width:90px">
+                <label for="tone_{{.Key}}_freq2">Freq 2 (Hz)</label>
+                <input type="number" id="tone_{{.Key}}_freq2" name="tone_{{.Key}}_freq2" value="{{.Tone.Freq2}}">
+              </div>
+              <div class="field" style="min-width:110px">
+                <label for="tone_{{.Key}}_duration">Duration (ms)</label>
+                <input type="number" id="tone_{{.Key}}_duration" name="tone_{{.Key}}_duration" value="{{.Tone.DurationMS}}">
+              </div>
+              <div class="field" style="min-width:100px">
+                <label for="tone_{{.Key}}_amplitude">Amplitude</label>
+                <input type="number" id="tone_{{.Key}}_amplitude" name="tone_{{.Key}}_amplitude" value="{{.Tone.Amplitude}}">
+              </div>
+            </div>
+            {{else if eq .Mode "tone-raw"}}
+            <input type="text" name="raw_{{.Key}}" value="{{.Value}}">
+            <div class="hint">Multi-part tone — edit as raw text (freq1,freq2,duration,amplitude per part).</div>
+            {{else}}
+            <input type="text" name="raw_{{.Key}}" value="{{.Value}}" list="sound_files" placeholder="a sound file name">
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <p class="hint">No tones/audio entries found in this node's telemetry section.</p>
+    {{end}}
+    <div class="actions">
+      <button type="submit" class="primary">Save tones &amp; audio</button>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Custom sound files</h2>
+    {{template "help" "Your own uploaded recordings, stored separately from app_rpt's built-in prompt library (shown in the pick-lists above as \"rpt/...\", which this app never modifies). Pick a file's name here to use it in idrecording or any tone/audio field above."}}
+  </div>
+  {{$anyCustom := false}}
+  {{range .SoundFiles}}{{if .Custom}}{{$anyCustom = true}}{{end}}{{end}}
+  {{if $anyCustom}}
+  <table>
+    <thead><tr><th>Name</th><th></th></tr></thead>
+    <tbody>
+      {{range .SoundFiles}}
+      {{if .Custom}}
+      <tr>
+        <td>{{.Name}}</td>
+        <td>
+          <form method="post" action="/nodes/{{$.Node.Number}}/sounds/{{.Name}}/delete" style="display:inline" data-confirm="Delete sound file {{.Name}}? Any field currently referencing it will stop working until you pick a replacement." data-confirm-danger>
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No custom sound files uploaded yet.</p>
+  {{end}}
+</div>
+
+<form method="post" action="/nodes/{{.Node.Number}}/sounds/upload" enctype="multipart/form-data">
+  <div class="card">
+    <div class="label-row">
+      <h2 style="margin:0">Upload a sound file</h2>
+      {{template "help" "Upload a WAV recording (e.g. a custom station ID or courtesy tone) and it's automatically converted to the format app_rpt needs. The conversion tool's own output is shown if anything goes wrong, rather than guessing at what happened."}}
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="sound_name">Name</label>
+        <input type="text" id="sound_name" name="sound_name" placeholder="my-station-id" required pattern="[a-zA-Z0-9_-]+">
+        <div class="hint">Letters, numbers, - and _ only. Uploading with an existing name replaces it.</div>
+      </div>
+      <div class="field">
+        <label for="sound_file">Audio file (WAV recommended)</label>
+        <input type="file" id="sound_file" name="sound_file" accept="audio/*" required>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Upload &amp; convert</button>
+    </div>
+  </div>
+</form>
 
 <form method="post" action="/nodes/{{.Node.Number}}/registration">
   <div class="card">

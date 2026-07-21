@@ -13,6 +13,7 @@ import (
 	"hamvoipconfiggui/internal/auth"
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/nodedb"
+	"hamvoipconfiggui/internal/sounds"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -42,6 +43,11 @@ type Server struct {
 	// live pushes each node's moment-to-moment state to the "Right now"
 	// card over SSE. Always non-nil.
 	live *liveHub
+
+	// sounds manages the operator's own custom sound files and offers
+	// app_rpt's stock prompt library as read-only reference — see
+	// internal/sounds's package doc for the distinction. Always non-nil.
+	sounds *sounds.Store
 }
 
 // NodeDB exposes the node directory so main can start its refresh loop.
@@ -64,8 +70,10 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 // name, if on PATH) to the 818-prog SA818/DRA818 radio module
 // programmer used by the System page's radio module card; sa818StatePath
 // is where the last settings sent to it are recorded (see internal/sa818).
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL)}
+// soundsCustomDir/soundsStockDir/soxTool configure the "Tones & Audio"
+// section's sound file management — see internal/sounds's package doc.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool)}
 	s.live = newLiveHub(s)
 
 	tmpl, err := parseTemplates(templatesFS)
@@ -132,6 +140,9 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/macrodefs", s.requireAuth(s.handleNodeMacroDefSave))
 	s.mux.HandleFunc("POST /nodes/{number}/macrodefs/{digits}/delete", s.requireAuth(s.handleNodeMacroDefDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/dtmf", s.requireAuth(s.handleNodeSendDTMF))
+	s.mux.HandleFunc("POST /nodes/{number}/telemetry", s.requireAuth(s.handleNodeTelemetrySave))
+	s.mux.HandleFunc("POST /nodes/{number}/sounds/upload", s.requireAuth(s.handleNodeSoundUpload))
+	s.mux.HandleFunc("POST /nodes/{number}/sounds/{name}/delete", s.requireAuth(s.handleNodeSoundDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))

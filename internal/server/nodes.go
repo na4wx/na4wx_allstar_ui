@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/sounds"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -96,6 +97,14 @@ type nodeFormData struct {
 	MacroDefs     []config.FunctionMacro
 	LinkStatus    string
 	LinkStatusErr string
+
+	// Tones & Audio: the node's telemetry entries as friendly rows (see
+	// telemetry.go's buildTelemetryRows) and the combined custom+stock
+	// sound list offered as pick-list options for idrecording and any
+	// sound-reference telemetry field.
+	TelemetrySect string
+	TelemetryRows []telemetryRow
+	SoundFiles    []sounds.File
 }
 
 // radioChannelOption is one entry in the RX/TX channel dropdown: a
@@ -203,6 +212,7 @@ func (s *Server) renderNodeEditPageWithNode(w http.ResponseWriter, r *http.Reque
 	data.Registration, data.Peer = s.loadRegistrationInfo(n.Number)
 	data.pageData = pd
 	s.populateNodeLiveStatus(r, &data)
+	s.populateNodeTelemetry(&data)
 	s.render(w, "node_form.html", data)
 }
 
@@ -298,6 +308,7 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 		data.RadioMode = "new"
 		data.Device = device
 		s.populateNodeLiveStatus(r, &data)
+		s.populateNodeTelemetry(&data)
 		s.render(w, "node_form.html", data)
 		return
 	}

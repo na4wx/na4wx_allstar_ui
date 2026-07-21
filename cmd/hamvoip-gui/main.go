@@ -31,6 +31,9 @@ func main() {
 	nodeDBPath := flag.String("node-db-file", nodedb.DefaultPath, "path to the local copy of AllStarLink's node directory (node number -> callsign/description/location), used only to show callsigns beside node numbers; this is the same path ASL's own asl3-update-astdb uses, so other dashboards on the system share it")
 	nodeDBURL := flag.String("node-db-url", nodedb.DefaultURL, "where to download the node directory from, refreshed daily")
 	nodeDBRefresh := flag.Bool("node-db-refresh", true, "download the node directory daily; set false to only read whatever copy already exists on disk and never make outbound requests")
+	soundsCustomDir := flag.String("sounds-custom-dir", "/etc/asterisk/local", "directory for the operator's own uploadable sound files (station ID, custom courtesy tones) — confirmed on real HamVoIP hardware to already hold the node's station-ID recording")
+	soundsStockDir := flag.String("sounds-stock-dir", "/var/lib/asterisk/sounds/rpt", "app_rpt's own built-in prompt library, offered as read-only pick-list options (e.g. \"rpt/callproceeding\") — never written to")
+	soxTool := flag.String("sox-tool", "sox", "path to the sox audio tool, or bare name if it's on PATH (used to transcode an uploaded sound file to the 8kHz mono format app_rpt expects)")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -55,7 +58,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
