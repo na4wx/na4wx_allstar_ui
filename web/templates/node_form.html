@@ -31,6 +31,9 @@
 <datalist id="sound_files">
   {{range .SoundFiles}}<option value="{{.Ref}}">{{.Ref}}{{if not .Custom}} (built-in){{end}}</option>{{end}}
 </datalist>
+<datalist id="ct_keys">
+  {{range .CTKeys}}<option value="{{.}}">{{.}}</option>{{end}}
+</datalist>
 
 <div class="tabs" data-node-number="{{.Node.Number}}">
   <button type="button" data-tab-target="setup">Setup</button>
@@ -246,6 +249,36 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="label-row">
+      <h2 style="margin:0">When each courtesy tone plays</h2>
+      {{template "help" "This node's telemetry section (see the Tones & Audio tab) defines several courtesy tones, but a tone name like \"ct2\" has no fixed meaning on its own — these three settings are what actually decide which tone plays in which situation. Leave a field blank to use app_rpt's default for that situation."}}
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="unlinkedct">When not connected to any node</label>
+          {{template "help" "Which courtesy tone plays while this node is idle, not connected to any other node."}}
+        </div>
+        <input type="text" id="unlinkedct" name="unlinkedct" value="{{.Node.UnlinkedCT}}" list="ct_keys" placeholder="e.g. ct2">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="remotect">When a remote base is connected</label>
+          {{template "help" "Which courtesy tone plays when a remote base radio is connected locally. Only relevant if this node controls a remote base."}}
+        </div>
+        <input type="text" id="remotect" name="remotect" value="{{.Node.RemoteCT}}" list="ct_keys" placeholder="e.g. ct3">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="linkunkeyct">When a connected node unkeys</label>
+          {{template "help" "Which courtesy tone plays when a station on a connected/linked node releases its transmitter."}}
+        </div>
+        <input type="text" id="linkunkeyct" name="linkunkeyct" value="{{.Node.LinkUnkeyCT}}" list="ct_keys" placeholder="e.g. ct8">
+      </div>
+    </div>
+  </div>
+
   <div class="actions">
     <button type="submit" class="primary">Save</button>
     <a class="btn" href="/">Cancel</a>
@@ -269,7 +302,17 @@
       <tbody>
         {{range .TelemetryRows}}
         <tr>
-          <td style="white-space:nowrap">{{.Key}}</td>
+          <td style="white-space:nowrap">
+            {{if .Label}}
+            <div class="label-row" style="margin-bottom:0">
+              <strong>{{.Label}}</strong>
+              {{if .Description}}{{template "help" .Description}}{{end}}
+            </div>
+            <div class="hint">{{.Key}}</div>
+            {{else}}
+            {{.Key}}
+            {{end}}
+          </td>
           <td>
             {{if eq .Mode "tone"}}
             <div class="row" style="margin:0">

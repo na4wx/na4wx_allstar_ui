@@ -354,3 +354,35 @@ func TestClearingFieldRemovesKey(t *testing.T) {
 		t.Fatalf("telemetry key should have been removed:\n%s", raw)
 	}
 }
+
+// TestNodeCourtesyToneAssignmentsRoundTrip covers the three fields that
+// decide which ctN courtesy tone plays in which situation, using the
+// exact values confirmed present in a real node's own rpt.conf
+// (unlinkedct=ct2, remotect=ct3, linkunkeyct=ct8).
+func TestNodeCourtesyToneAssignmentsRoundTrip(t *testing.T) {
+	s := newTestStore(t)
+	n, err := s.LoadNode("2001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n.UnlinkedCT = "ct2"
+	n.RemoteCT = "ct3"
+	n.LinkUnkeyCT = "ct8"
+	if err := s.SaveNode(n); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.LoadNode("2001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.UnlinkedCT != "ct2" {
+		t.Errorf("UnlinkedCT = %q, want ct2", got.UnlinkedCT)
+	}
+	if got.RemoteCT != "ct3" {
+		t.Errorf("RemoteCT = %q, want ct3", got.RemoteCT)
+	}
+	if got.LinkUnkeyCT != "ct8" {
+		t.Errorf("LinkUnkeyCT = %q, want ct8", got.LinkUnkeyCT)
+	}
+}

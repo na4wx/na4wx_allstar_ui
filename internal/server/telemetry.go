@@ -28,12 +28,110 @@ type telemetryRow struct {
 	// (not tone syntax at all — edited as a sound-file reference).
 	Mode string
 	Tone config.ToneSpec // populated only when Mode == "tone"
+
+	// Label and Description explain what this entry is *for*, since a
+	// bare key like "ct1" means nothing to someone who didn't write
+	// app_rpt. See telemetryKeyLabel/telemetryKeyDescription.
+	Label       string
+	Description string
 }
 
-func buildTelemetryRows(entries []config.TelemetryEntry) []telemetryRow {
+// telemetryKeyLabel gives a plain-English name for a telemetry key,
+// sourced from AllStarLink's own rpt.conf documentation
+// (allstarlink.github.io/config/rpt_conf) rather than guessed. Courtesy
+// tones (ct1-ct8) don't get a fixed label here — what each one is
+// *for*, if anything, depends on this node's own unlinkedct/remotect/
+// linkunkeyct fields, which telemetryKeyDescription reads directly
+// instead of assuming a universal meaning that could be wrong for a
+// node that assigns them differently.
+func telemetryKeyLabel(key string) string {
+	switch key {
+	case "cmdmode":
+		return "Command-mode beep"
+	case "functcomplete":
+		return "Command-complete tone"
+	case "patchup":
+		return "Autopatch connected"
+	case "patchdown":
+		return "Autopatch ended"
+	case "remotetx":
+		return "Remote base transmitting"
+	case "remotemon":
+		return "Remote base monitoring"
+	default:
+		if isCourtesyToneKey(key) {
+			return "Courtesy tone"
+		}
+		return ""
+	}
+}
+
+// telemetryKeyDescription explains what a telemetry entry is for. For
+// the fixed-meaning keys this is a static, sourced description; for a
+// courtesy tone (ct1-ct8) it's built from node's own
+// UnlinkedCT/RemoteCT/LinkUnkeyCT fields, since app_rpt doesn't give
+// ctN a fixed meaning by number — the node's own settings decide which
+// one plays in which situation (confirmed both in AllStarLink's rpt.conf
+// docs and in a real node's own inline comments: unlinkedct=ct2,
+// remotect=ct3, linkunkeyct=ct8 on that node — a different node could
+// assign the exact same three roles to entirely different numbers).
+func telemetryKeyDescription(key string, node *config.Node) string {
+	switch key {
+	case "cmdmode":
+		return "Plays when you start entering a touch-tone command, confirming the node is listening for it."
+	case "functcomplete":
+		return "Plays right after a touch-tone command finishes successfully."
+	case "patchup":
+		return "Plays when an autopatch (phone) call connects."
+	case "patchdown":
+		return "Plays when an autopatch (phone) call ends."
+	case "remotetx":
+		return "Only used if this node controls a remote base radio: plays when that remote radio starts transmitting."
+	case "remotemon":
+		return "Only used if this node controls a remote base radio: plays while monitoring that remote radio."
+	}
+	if !isCourtesyToneKey(key) {
+		return ""
+	}
+	var roles []string
+	if node != nil {
+		if key == node.UnlinkedCT && key != "" {
+			roles = append(roles, "this node isn't connected to any other node")
+		}
+		if key == node.RemoteCT && key != "" {
+			roles = append(roles, "a remote base radio is connected locally")
+		}
+		if key == node.LinkUnkeyCT && key != "" {
+			roles = append(roles, "a connected node unkeys")
+		}
+	}
+	if len(roles) == 0 {
+		return "One of this node's courtesy tones. It isn't currently assigned to unlinked/remote-base/link-unkey below, so check what uses it before changing it."
+	}
+	return "Plays when " + strings.Join(roles, ", and also when ") + "."
+}
+
+// isCourtesyToneKey reports whether key is one of app_rpt's fixed
+// courtesy-tone slots (ct1 through ct8, per its own documentation — this
+// isn't an arbitrary "ct"-prefixed match, it's exactly that set).
+func isCourtesyToneKey(key string) bool {
+	switch key {
+	case "ct1", "ct2", "ct3", "ct4", "ct5", "ct6", "ct7", "ct8":
+		return true
+	default:
+		return false
+	}
+}
+
+func buildTelemetryRows(entries []config.TelemetryEntry, node *config.Node) []telemetryRow {
 	rows := make([]telemetryRow, 0, len(entries))
 	for _, e := range entries {
-		row := telemetryRow{Key: e.Key, Value: e.Value}
+		row := telemetryRow{
+			Key:         e.Key,
+			Value:       e.Value,
+			Label:       telemetryKeyLabel(e.Key),
+			Description: telemetryKeyDescription(e.Key, node),
+		}
 		if spec, ok := config.ParseSingleTone(e.Value); ok {
 			row.Mode = "tone"
 			row.Tone = spec
@@ -45,6 +143,21 @@ func buildTelemetryRows(entries []config.TelemetryEntry) []telemetryRow {
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+// courtesyToneKeys returns the courtesy-tone keys (ct1-ct8) actually
+// present in entries, in file order — the valid choices for this node's
+// unlinkedct/remotect/linkunkeyct assignment fields. Built from what's
+// really there rather than always offering all 8, since a node's
+// telemetry section might only define the ones it actually uses.
+func courtesyToneKeys(entries []config.TelemetryEntry) []string {
+	var keys []string
+	for _, e := range entries {
+		if isCourtesyToneKey(e.Key) {
+			keys = append(keys, e.Key)
+		}
+	}
+	return keys
 }
 
 // populateNodeTelemetry fills data's "Tones & Audio" fields: the node's
@@ -63,7 +176,8 @@ func (s *Server) populateNodeTelemetry(data *nodeFormData) {
 	}
 	data.TelemetrySect = section
 	if entries, err := s.store.ListTelemetryEntries(section); err == nil {
-		data.TelemetryRows = buildTelemetryRows(entries)
+		data.TelemetryRows = buildTelemetryRows(entries, node)
+		data.CTKeys = courtesyToneKeys(entries)
 	}
 	if files, err := s.sounds.ListAll(); err == nil {
 		data.SoundFiles = files

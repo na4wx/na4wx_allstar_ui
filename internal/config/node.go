@@ -50,6 +50,20 @@ type Node struct {
 	TOTime      string // ms, transmit timeout
 	IDTime      string // ms between IDs
 	IDRecording string // sound file/macro used for station ID
+
+	// These three decide WHICH of the telemetry section's ct1-ct8
+	// courtesy tones actually plays in which situation — confirmed
+	// against AllStarLink's own rpt.conf documentation and cross-checked
+	// against a real node's own inline comments (unlinkedct=ct2,
+	// remotect=ct3, linkunkeyct=ct8). Without these, a courtesy tone
+	// name like "ct2" means nothing on its own; the "Tones & Audio" UI
+	// uses these fields to label each one with what it's actually used
+	// for on this specific node, rather than guessing or hardcoding a
+	// universal meaning that could be wrong for a node that assigns
+	// them differently.
+	UnlinkedCT  string // courtesy tone played when not connected to any other node
+	RemoteCT    string // courtesy tone played when a remote base is connected locally
+	LinkUnkeyCT string // courtesy tone played when a connected/linked node unkeys
 }
 
 // nodeFields lists the per-node-section keys mapped onto Node, in the
@@ -70,6 +84,9 @@ var nodeFields = []struct {
 	{"totime", func(n *Node) *string { return &n.TOTime }},
 	{"idtime", func(n *Node) *string { return &n.IDTime }},
 	{"idrecording", func(n *Node) *string { return &n.IDRecording }},
+	{"unlinkedct", func(n *Node) *string { return &n.UnlinkedCT }},
+	{"remotect", func(n *Node) *string { return &n.RemoteCT }},
+	{"linkunkeyct", func(n *Node) *string { return &n.LinkUnkeyCT }},
 }
 
 // ListNodes returns node numbers found in rpt.conf: every section whose

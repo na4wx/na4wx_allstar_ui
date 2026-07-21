@@ -104,6 +104,7 @@ type nodeFormData struct {
 	// sound-reference telemetry field.
 	TelemetrySect string
 	TelemetryRows []telemetryRow
+	CTKeys        []string // courtesy-tone keys (ct1-ct8) present in this node's telemetry section, for the unlinkedct/remotect/linkunkeyct pickers
 	SoundFiles    []sounds.File
 }
 
@@ -244,6 +245,9 @@ func nodeFromForm(r *http.Request, number string) *config.Node {
 		TOTime:      r.FormValue("totime"),
 		IDTime:      r.FormValue("idtime"),
 		IDRecording: r.FormValue("idrecording"),
+		UnlinkedCT:  r.FormValue("unlinkedct"),
+		RemoteCT:    r.FormValue("remotect"),
+		LinkUnkeyCT: r.FormValue("linkunkeyct"),
 	}
 	if number == "" {
 		n.Number = r.FormValue("number")

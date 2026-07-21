@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"testing"
 
 	"hamvoipconfiggui/internal/config"
@@ -15,7 +16,7 @@ func TestBuildTelemetryRowsRealEntries(t *testing.T) {
 		{Key: "ct2", Value: "|t(660,880,150,2048)"},
 		{Key: "patchup", Value: "rpt/callproceeding"},
 	}
-	rows := buildTelemetryRows(entries)
+	rows := buildTelemetryRows(entries, nil)
 	if len(rows) != 3 {
 		t.Fatalf("got %d rows, want 3", len(rows))
 	}
@@ -49,4 +50,79 @@ func TestAtoiField(t *testing.T) {
 			t.Errorf("atoiField(%q) ok = true, want false", bad)
 		}
 	}
+}
+
+// TestTelemetryKeyDescriptionRealAssignments uses the exact courtesy-
+// tone assignments confirmed present in a real node's own rpt.conf
+// (unlinkedct=ct2, remotect=ct3, linkunkeyct=ct8) -- this is the crux of
+// making ct1/ct2/etc. readable: the meaning comes from these fields, not
+// from the ctN number itself.
+func TestTelemetryKeyDescriptionRealAssignments(t *testing.T) {
+	node := &config.Node{UnlinkedCT: "ct2", RemoteCT: "ct3", LinkUnkeyCT: "ct8"}
+
+	if got := telemetryKeyDescription("ct2", node); !contains(got, "isn't connected") {
+		t.Errorf("ct2 description = %q, want it to explain the unlinked role", got)
+	}
+	if got := telemetryKeyDescription("ct3", node); !contains(got, "remote base") {
+		t.Errorf("ct3 description = %q, want it to explain the remote-base role", got)
+	}
+	if got := telemetryKeyDescription("ct8", node); !contains(got, "unkeys") {
+		t.Errorf("ct8 description = %q, want it to explain the link-unkey role", got)
+	}
+	// ct1 isn't assigned to any of the three roles on this node -- must
+	// say so rather than inventing a meaning or silently matching ct2's.
+	if got := telemetryKeyDescription("ct1", node); contains(got, "isn't connected") || contains(got, "remote base") || contains(got, "unkeys") {
+		t.Errorf("ct1 description = %q, want it to NOT claim any of the assigned roles", got)
+	}
+}
+
+func TestTelemetryKeyDescriptionFixedKeys(t *testing.T) {
+	cases := map[string]string{
+		"cmdmode":       "touch-tone command",
+		"functcomplete": "finishes successfully",
+		"patchup":       "connects",
+		"patchdown":     "ends",
+		"remotetx":      "remote base radio",
+		"remotemon":     "remote base radio",
+	}
+	for key, want := range cases {
+		if got := telemetryKeyDescription(key, nil); !contains(got, want) {
+			t.Errorf("telemetryKeyDescription(%q) = %q, want it to contain %q", key, got, want)
+		}
+	}
+}
+
+func TestTelemetryKeyLabel(t *testing.T) {
+	if got := telemetryKeyLabel("ct4"); got != "Courtesy tone" {
+		t.Errorf("label(ct4) = %q, want %q", got, "Courtesy tone")
+	}
+	if got := telemetryKeyLabel("cmdmode"); got == "" {
+		t.Error("label(cmdmode) is empty, want a real label")
+	}
+	if got := telemetryKeyLabel("some_custom_key"); got != "" {
+		t.Errorf("label(some_custom_key) = %q, want empty for an unrecognized key", got)
+	}
+}
+
+func TestCourtesyToneKeys(t *testing.T) {
+	entries := []config.TelemetryEntry{
+		{Key: "ct1", Value: "x"},
+		{Key: "ct2", Value: "x"},
+		{Key: "patchup", Value: "x"},
+		{Key: "ct8", Value: "x"},
+	}
+	got := courtesyToneKeys(entries)
+	want := []string{"ct1", "ct2", "ct8"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	}
+}
+
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }
