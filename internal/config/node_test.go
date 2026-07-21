@@ -358,17 +358,12 @@ func TestClearingFieldRemovesKey(t *testing.T) {
 // TestNodeCourtesyToneAssignmentsRoundTrip covers the three fields that
 // decide which ctN courtesy tone plays in which situation, using the
 // exact values confirmed present in a real node's own rpt.conf
-// (unlinkedct=ct2, remotect=ct3, linkunkeyct=ct8).
+// (unlinkedct=ct2, remotect=ct3, linkunkeyct=ct8). These are written via
+// SetCourtesyToneAssignments, not SaveNode — see courtesyToneFields'
+// doc comment for why SaveNode must never touch them.
 func TestNodeCourtesyToneAssignmentsRoundTrip(t *testing.T) {
 	s := newTestStore(t)
-	n, err := s.LoadNode("2001")
-	if err != nil {
-		t.Fatal(err)
-	}
-	n.UnlinkedCT = "ct2"
-	n.RemoteCT = "ct3"
-	n.LinkUnkeyCT = "ct8"
-	if err := s.SaveNode(n); err != nil {
+	if err := s.SetCourtesyToneAssignments("2001", "ct2", "ct3", "ct8"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -384,5 +379,19 @@ func TestNodeCourtesyToneAssignmentsRoundTrip(t *testing.T) {
 	}
 	if got.LinkUnkeyCT != "ct8" {
 		t.Errorf("LinkUnkeyCT = %q, want ct8", got.LinkUnkeyCT)
+	}
+
+	// SaveNode must never blank these out, even though nodeFromForm no
+	// longer populates them (the Setup tab form doesn't carry these
+	// fields at all now that they live on their own Tones & Audio form).
+	if err := s.SaveNode(got); err != nil {
+		t.Fatal(err)
+	}
+	still, err := s.LoadNode("2001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if still.UnlinkedCT != "ct2" || still.RemoteCT != "ct3" || still.LinkUnkeyCT != "ct8" {
+		t.Errorf("SaveNode altered courtesy tone fields: got %+v", still)
 	}
 }

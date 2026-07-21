@@ -249,10 +249,22 @@
     </div>
   </div>
 
+  <div class="actions">
+    <button type="submit" class="primary">Save</button>
+    <a class="btn" href="/">Cancel</a>
+    <span style="flex:1"></span>
+    <button type="submit" form="delete_node_form" class="danger" data-confirm="Delete node {{.Node.Number}}? This removes it from every config file it appears in, including its radio device (unless another node still uses it). This cannot be undone." data-confirm-danger>Delete node</button>
+  </div>
+</form>
+<form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
+</div>
+
+<div data-tab-panel="tones">
+<form method="post" action="/nodes/{{.Node.Number}}/courtesy-tones">
   <div class="card">
     <div class="label-row">
       <h2 style="margin:0">When each courtesy tone plays</h2>
-      {{template "help" "This node's telemetry section (see the Tones & Audio tab) defines several courtesy tones, but a tone name like \"ct2\" has no fixed meaning on its own — these three settings are what actually decide which tone plays in which situation. Leave a field blank to use app_rpt's default for that situation."}}
+      {{template "help" "The ct1-ct8 entries below define several courtesy tones, but a tone name like \"ct2\" has no fixed meaning on its own — these three settings are what actually decide which tone plays in which situation. Leave a field blank to use app_rpt's default for that situation."}}
     </div>
     <div class="row">
       <div class="field">
@@ -277,19 +289,11 @@
         <input type="text" id="linkunkeyct" name="linkunkeyct" value="{{.Node.LinkUnkeyCT}}" list="ct_keys" placeholder="e.g. ct8">
       </div>
     </div>
-  </div>
-
-  <div class="actions">
-    <button type="submit" class="primary">Save</button>
-    <a class="btn" href="/">Cancel</a>
-    <span style="flex:1"></span>
-    <button type="submit" form="delete_node_form" class="danger" data-confirm="Delete node {{.Node.Number}}? This removes it from every config file it appears in, including its radio device (unless another node still uses it). This cannot be undone." data-confirm-danger>Delete node</button>
+    <div class="actions">
+      <button type="submit" class="primary">Save courtesy tone assignments</button>
+    </div>
   </div>
 </form>
-<form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
-</div>
-
-<div data-tab-panel="tones">
 <form method="post" action="/nodes/{{.Node.Number}}/telemetry">
   <div class="card">
     <div class="label-row">

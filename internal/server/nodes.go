@@ -245,9 +245,6 @@ func nodeFromForm(r *http.Request, number string) *config.Node {
 		TOTime:      r.FormValue("totime"),
 		IDTime:      r.FormValue("idtime"),
 		IDRecording: r.FormValue("idrecording"),
-		UnlinkedCT:  r.FormValue("unlinkedct"),
-		RemoteCT:    r.FormValue("remotect"),
-		LinkUnkeyCT: r.FormValue("linkunkeyct"),
 	}
 	if number == "" {
 		n.Number = r.FormValue("number")

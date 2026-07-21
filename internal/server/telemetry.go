@@ -259,6 +259,34 @@ func (s *Server) handleNodeTelemetrySave(w http.ResponseWriter, r *http.Request)
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
 }
 
+// handleNodeCourtesyToneSave saves the "When each courtesy tone plays"
+// card's three fields via config.Store.SetCourtesyToneAssignments — a
+// narrow update touching only unlinkedct/remotect/linkunkeyct, not the
+// rest of the node. This lives on its own route (rather than folding
+// into the Setup tab's whole-node save) specifically so this card can be
+// shown on the Tones & Audio tab, right next to the ct1-ct8 entries it
+// controls, without a blank Setup-tab field ever being able to wipe it or
+// vice versa.
+func (s *Server) handleNodeCourtesyToneSave(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	unlinkedCT := strings.TrimSpace(r.FormValue("unlinkedct"))
+	remoteCT := strings.TrimSpace(r.FormValue("remotect"))
+	linkUnkeyCT := strings.TrimSpace(r.FormValue("linkunkeyct"))
+	if err := s.store.SetCourtesyToneAssignments(number, unlinkedCT, remoteCT, linkUnkeyCT); err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
+}
+
 // handleNodeSoundUpload handles an uploaded audio file (typically a
 // WAV), transcodes it via sox, and saves it as a custom sound the
 // operator can then pick for idrecording or any telemetry entry.

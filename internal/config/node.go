@@ -84,6 +84,19 @@ var nodeFields = []struct {
 	{"totime", func(n *Node) *string { return &n.TOTime }},
 	{"idtime", func(n *Node) *string { return &n.IDTime }},
 	{"idrecording", func(n *Node) *string { return &n.IDRecording }},
+}
+
+// courtesyToneFields lists the unlinkedct/remotect/linkunkeyct keys.
+// Deliberately kept out of nodeFields: those three are edited via their
+// own "Tones & Audio" tab form, which posts only these three keys, so
+// SaveNode's whole-node resubmit must never touch them — otherwise every
+// ordinary Setup-tab save (which no longer carries these fields at all)
+// would blank them out. LoadNode still reads them directly, below. See
+// SetCourtesyToneAssignments for the narrow write path.
+var courtesyToneFields = []struct {
+	key string
+	get func(*Node) *string
+}{
 	{"unlinkedct", func(n *Node) *string { return &n.UnlinkedCT }},
 	{"remotect", func(n *Node) *string { return &n.RemoteCT }},
 	{"linkunkeyct", func(n *Node) *string { return &n.LinkUnkeyCT }},
@@ -129,6 +142,11 @@ func (s *Store) LoadNode(number string) (*Node, error) {
 			*fld.get(n) = v
 		}
 	}
+	for _, fld := range courtesyToneFields {
+		if v, ok := f.Get(number, fld.key); ok {
+			*fld.get(n) = v
+		}
+	}
 	return n, nil
 }
 
@@ -168,6 +186,40 @@ func (s *Store) SaveNode(n *Node) error {
 		f.Set(n.Number, fld.key, v)
 	}
 
+	return s.save(RptConfFile, f)
+}
+
+// SetCourtesyToneAssignments updates just unlinkedct/remotect/linkunkeyct
+// on number's own rpt.conf section, leaving every other field on that
+// section untouched — the narrow-update counterpart to SaveNode's
+// whole-node rewrite, used by the "Tones & Audio" tab's own scoped form
+// (see SaveNode's courtesyToneFields comment for why these three can't
+// go through SaveNode). Blank clears a key, falling back to app_rpt's own
+// default for that situation, matching SaveNode's blank-means-delete
+// convention for every other field.
+func (s *Store) SetCourtesyToneAssignments(number, unlinkedCT, remoteCT, linkUnkeyCT string) error {
+	if !nodeSectionRe.MatchString(number) {
+		return fmt.Errorf("config: node number must be numeric")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, err := s.load(RptConfFile)
+	if err != nil {
+		return err
+	}
+	if !f.HasSection(number) {
+		return fmt.Errorf("config: node %s not found in %s", number, RptConfFile)
+	}
+	set := func(key, value string) {
+		if value == "" {
+			f.Delete(number, key)
+			return
+		}
+		f.Set(number, key, value)
+	}
+	set("unlinkedct", unlinkedCT)
+	set("remotect", remoteCT)
+	set("linkunkeyct", linkUnkeyCT)
 	return s.save(RptConfFile, f)
 }
 
