@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"hamvoipconfiggui/internal/auth"
@@ -48,6 +49,18 @@ type Server struct {
 	// app_rpt's stock prompt library as read-only reference — see
 	// internal/sounds's package doc for the distinction. Always non-nil.
 	sounds *sounds.Store
+
+	// restartNeeded tracks whether any Asterisk config file has been
+	// saved since Asterisk was last (re)started — set via
+	// config.Store.SetChangeHook (every save is to an Asterisk/app_rpt
+	// file; see that hook's doc), cleared once handleSystemRestartAsterisk
+	// or handleApplyRestart actually restarts it. Read by the
+	// "restartNeeded" template func to show the red bar on every logged-in
+	// page. Resets to false if this process restarts, independent of
+	// Asterisk's own state — an acceptable gap, since that's also when an
+	// operator is most likely to restart Asterisk anyway (e.g. as part of
+	// a HamVoIP reboot).
+	restartNeeded atomic.Bool
 }
 
 // NodeDB exposes the node directory so main can start its refresh loop.
@@ -75,8 +88,9 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool string) (*Server, error) {
 	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool)}
 	s.live = newLiveHub(s)
+	store.SetChangeHook(func(string) { s.restartNeeded.Store(true) })
 
-	tmpl, err := parseTemplates(templatesFS)
+	tmpl, err := s.parseTemplates(templatesFS)
 	if err != nil {
 		return nil, err
 	}
@@ -86,15 +100,16 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 	return s, nil
 }
 
-func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
+func (s *Server) parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
 	pages := []string{"setup.html", "login.html", "home.html", "stats.html", "nodes_index.html", "node_new.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
+	funcs := template.FuncMap{"restartNeeded": func() bool { return s.restartNeeded.Load() }}
 	out := map[string]*template.Template{}
 	for _, page := range pages {
 		// radio_device_fields.html is a shared partial ({{template
 		// "radio_device_fields" ...}}), included for every page since
 		// it's harmless where unused and needed by both node_form.html
 		// and radio_form.html.
-		t, err := template.ParseFS(templatesFS, "layout.html", "radio_device_fields.html", "node_history.html", page)
+		t, err := template.New("layout.html").Funcs(funcs).ParseFS(templatesFS, "layout.html", "radio_device_fields.html", "node_history.html", page)
 		if err != nil {
 			return nil, err
 		}
@@ -160,6 +175,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /system/sharipi/apply", s.requireAuth(s.handleSystemShariApply))
 	s.mux.HandleFunc("POST /system/sa818/apply", s.requireAuth(s.handleSystemSA818Apply))
 	s.mux.HandleFunc("POST /system/restart-asterisk", s.requireAuth(s.handleSystemRestartAsterisk))
+	s.mux.HandleFunc("POST /system/apply-restart", s.requireAuth(s.handleApplyRestart))
 	s.mux.HandleFunc("POST /system/reboot", s.requireAuth(s.handleSystemReboot))
 	// Radio device editing (adjusting an already-created device) — device
 	// *creation* only happens inline from a node's own page now.

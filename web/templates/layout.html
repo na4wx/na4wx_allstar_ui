@@ -27,6 +27,14 @@
       </form>
     </nav>
   </header>
+  {{if restartNeeded}}
+  <div class="restart-bar">
+    <span>Asterisk must be restarted for changes to be applied.</span>
+    <form method="post" action="/system/apply-restart">
+      <button type="submit">Apply Changes</button>
+    </form>
+  </div>
+  {{end}}
   {{end}}
   <main>
     {{if .Flash}}<div class="flash {{.FlashKind}}">{{.Flash}}</div>{{end}}

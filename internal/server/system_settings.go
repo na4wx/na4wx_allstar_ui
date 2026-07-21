@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -292,7 +293,43 @@ func (s *Server) handleSystemRestartAsterisk(w http.ResponseWriter, r *http.Requ
 		s.renderSystemPage(w, r, flash("error", err.Error()))
 		return
 	}
+	s.restartNeeded.Store(false)
 	s.renderSystemPage(w, r, flash("ok", "Asterisk restarted"))
+}
+
+// handleApplyRestart is the "Apply Changes" button on the red
+// "Asterisk must be restarted" bar (see layout.html/restartNeeded),
+// reachable from any page rather than just the System page. It restarts
+// Asterisk the same way handleSystemRestartAsterisk does, but returns the
+// operator to whatever page they clicked it from instead of always
+// jumping to System — the bar disappearing is confirmation enough, so
+// there's no flash message to carry across the redirect.
+func (s *Server) handleApplyRestart(w http.ResponseWriter, r *http.Request) {
+	if err := system.AsteriskRestart(r.Context(), s.asteriskBin); err != nil {
+		s.renderSystemPage(w, r, flash("error", err.Error()))
+		return
+	}
+	s.restartNeeded.Store(false)
+	http.Redirect(w, r, refererPath(r), http.StatusSeeOther)
+}
+
+// refererPath returns the request's Referer, restricted to same-origin
+// (host) so this can never be used to redirect somewhere the operator
+// didn't just come from, falling back to "/" if it's missing, malformed,
+// or points elsewhere.
+func refererPath(r *http.Request) string {
+	ref := r.Header.Get("Referer")
+	if ref == "" {
+		return "/"
+	}
+	u, err := url.Parse(ref)
+	if err != nil || u.Host != r.Host || u.Path == "" {
+		return "/"
+	}
+	if u.RawQuery != "" {
+		return u.Path + "?" + u.RawQuery
+	}
+	return u.Path
 }
 
 func (s *Server) handleSystemReboot(w http.ResponseWriter, r *http.Request) {

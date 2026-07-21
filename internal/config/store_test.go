@@ -72,3 +72,32 @@ func TestListNodesOnMissingRptConf(t *testing.T) {
 		t.Fatalf("expected no nodes, got %v", nodes)
 	}
 }
+
+// TestChangeHookFiresOnSave covers the mechanism the server package uses
+// to show its "Asterisk must be restarted" bar: every write to any
+// Asterisk config file must call the installed hook exactly once, naming
+// the file that changed, so the server never has to remember to flag it
+// per handler.
+func TestChangeHookFiresOnSave(t *testing.T) {
+	dir := t.TempDir()
+	s := NewStore(dir)
+
+	var got []string
+	s.SetChangeHook(func(file string) { got = append(got, file) })
+
+	if err := s.SetTelemetryEntry("telemetry2000", "ct1", "|t(660,0,150,2048)"); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != RptConfFile {
+		t.Fatalf("change hook calls = %v, want one call with %q", got, RptConfFile)
+	}
+}
+
+func TestChangeHookNotRequired(t *testing.T) {
+	dir := t.TempDir()
+	s := NewStore(dir)
+	// No SetChangeHook call at all -- must not panic.
+	if err := s.SetTelemetryEntry("telemetry2000", "ct1", "|t(660,0,150,2048)"); err != nil {
+		t.Fatal(err)
+	}
+}

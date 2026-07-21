@@ -139,6 +139,33 @@ header.topbar nav form { margin-left: 1.25rem; }
 }
 .nav-toggle:hover { background: var(--surface-2); }
 
+.restart-bar {
+  position: sticky;
+  top: 0;
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 1.5rem;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+.restart-bar form { margin: 0; }
+.restart-bar button {
+  flex-shrink: 0;
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--danger);
+  font-weight: 620;
+  cursor: pointer;
+}
+.restart-bar button:hover { background: color-mix(in srgb, #fff 88%, var(--danger)); }
+
 main {
   max-width: 1040px;
   margin: 0 auto;

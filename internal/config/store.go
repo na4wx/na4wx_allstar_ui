@@ -19,10 +19,26 @@ import (
 type Store struct {
 	dir string
 	mu  sync.Mutex
+
+	// onChange, if set, is called after every successful write to a
+	// config file — every one of which is an Asterisk/app_rpt file
+	// (rpt.conf, iax.conf, extensions.conf, usbradio.conf/simpleusb.conf)
+	// that Asterisk only picks up on its next restart. The server package
+	// uses this single hook to flag "Asterisk must be restarted" across
+	// every page, rather than every save handler having to remember to
+	// say so itself.
+	onChange func(file string)
 }
 
 func NewStore(dir string) *Store {
 	return &Store{dir: dir}
+}
+
+// SetChangeHook installs fn to be called with the file name after every
+// successful save (see the onChange field doc). Not safe to call
+// concurrently with saves; intended to be set once at startup.
+func (s *Store) SetChangeHook(fn func(file string)) {
+	s.onChange = fn
 }
 
 func (s *Store) path(name string) string {
@@ -57,6 +73,9 @@ func (s *Store) save(name string, f *asteriskconf.File) error {
 	}
 	if err := f.WriteFile(s.path(name), perm); err != nil {
 		return fmt.Errorf("config: save %s: %w", name, err)
+	}
+	if s.onChange != nil {
+		s.onChange(name)
 	}
 	return nil
 }
