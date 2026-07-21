@@ -1,3 +1,37 @@
+// Mobile nav toggle. The nav itself stays plain markup (a <nav> full of
+// links) at every width; only visibility is different below the
+// max-width:620px breakpoint, where CSS hides it behind this hamburger
+// button instead of letting it overflow the header (confirmed: at
+// 375px wide the uncollapsed nav overflowed the viewport by 100px+,
+// pushing "Log out" off-screen with no way to reach it at all).
+(function () {
+  const toggle = document.querySelector("[data-nav-toggle]");
+  const nav = document.querySelector("[data-nav]");
+  if (!toggle || !nav) return;
+
+  function setOpen(open) {
+    nav.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  toggle.addEventListener("click", () => setOpen(!nav.classList.contains("open")));
+  document.addEventListener("click", (e) => {
+    // toggle.contains(e.target), not e.target !== toggle: the button's
+    // visible bars are child <span> elements, so a real click on the
+    // hamburger icon has e.target set to one of those spans, not the
+    // <button> itself. Comparing target directly against toggle missed
+    // that, so a click on the icon opened the nav via the listener
+    // above and then immediately closed it again here in the same
+    // bubbling click event -- the menu never appeared to open at all.
+    if (nav.classList.contains("open") && !nav.contains(e.target) && !toggle.contains(e.target)) {
+      setOpen(false);
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setOpen(false);
+  });
+})();
+
 // Node page tabs: a purely client-side grouping of already-independent
 // form sections (each [data-tab-panel] wraps one or more complete,
 // unmodified forms) into tabs, so switching tabs can never affect what

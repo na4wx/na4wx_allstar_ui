@@ -82,12 +82,22 @@ header.topbar .brand {
   font-weight: 650;
   letter-spacing: -0.015em;
   font-size: 1.02rem;
+  /* Truncates on a narrow screen instead of wrapping across multiple
+     lines — flex-shrink:1 plus min-width:0 is what lets a flex child
+     shrink below its content's natural width at all, which is required
+     for overflow/ellipsis to ever kick in on a flex item. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 header.topbar nav {
   display: flex;
   align-items: center;
   gap: 0.15rem;
+  flex-shrink: 0;
 }
 
 header.topbar nav a {
@@ -100,6 +110,34 @@ header.topbar nav a {
   transition: background 0.15s ease, color 0.15s ease;
 }
 header.topbar nav a:hover { color: var(--text); background: var(--surface-2); }
+
+header.topbar nav form { margin-left: 1.25rem; }
+
+/* Hamburger toggle: hidden on desktop, where nav already fits on one
+   row (see the max-width:620px block below for its mobile styling). */
+.nav-toggle {
+  display: none;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.nav-toggle span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text);
+}
+.nav-toggle:hover { background: var(--surface-2); }
 
 main {
   max-width: 1040px;
@@ -559,7 +597,35 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   .card { padding: 1.15rem; border-radius: var(--radius); }
   h1 { font-size: 1.45rem; }
   header.topbar { padding: 0.75rem 1rem; }
-  header.topbar nav a { padding: 0.35rem 0.5rem; font-size: 0.88rem; }
+
+  /* Below this width the nav (5 links + a logout button) no longer
+     fits on one row alongside the brand text — collapse it behind the
+     hamburger toggle instead of letting it overflow the viewport
+     (confirmed: at 375px it overflowed by over 100px, pushing "Log
+     out" completely off-screen with no way to reach it). */
+  .nav-toggle { display: flex; }
+  header.topbar nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  header.topbar nav.open { display: flex; }
+  header.topbar nav a {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.95rem;
+    border-radius: var(--radius-sm);
+  }
+  header.topbar nav form { margin: 0.25rem 0 0; }
+  header.topbar nav form button { width: 100%; }
 }
 
 /* Confirmation modal, replacing native confirm() so a prompt before a

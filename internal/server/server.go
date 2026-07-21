@@ -87,7 +87,7 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 }
 
 func parseTemplates(templatesFS fs.FS) (map[string]*template.Template, error) {
-	pages := []string{"setup.html", "login.html", "home.html", "stats.html", "node_new.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
+	pages := []string{"setup.html", "login.html", "home.html", "stats.html", "nodes_index.html", "node_new.html", "node_form.html", "config.html", "system.html", "radio_form.html"}
 	out := map[string]*template.Template{}
 	for _, page := range pages {
 		// radio_device_fields.html is a shared partial ({{template
@@ -123,7 +123,10 @@ func (s *Server) routes(staticFS fs.FS) {
 	// Node pages: the one-stop shop for a node's identity, radio
 	// hardware, command/tone set, AllStarLink registration, and live
 	// status/DTMF/macros — everything that used to be split across the
-	// Nodes, Radio, and Connections pages.
+	// Nodes, Radio, and Connections pages. GET /nodes itself is the fast
+	// find-and-manage list (no live asterisk -rx calls), distinct from
+	// Home (live status) and Stats (detailed history).
+	s.mux.HandleFunc("GET /nodes", s.requireAuth(s.handleNodesIndex))
 	s.mux.HandleFunc("GET /nodes/new", s.requireAuth(s.handleNodeNewForm))
 	s.mux.HandleFunc("POST /nodes", s.requireAuth(s.handleNodeCreate))
 	s.mux.HandleFunc("POST /nodes/sync-extensions", s.requireAuth(s.handleNodesSyncExtensions))
@@ -164,10 +167,9 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /system/radio/{file}/{name}/delete", s.requireAuth(s.handleRadioDelete))
 	s.mux.HandleFunc("POST /system/radio/{file}/placeholder", s.requireAuth(s.handleSystemAddPlaceholderDevice))
 
-	// Courtesy redirects for old bookmarks — Nodes/Radio/Connections no
-	// longer exist as standalone pages; everything they offered is
-	// reachable from Home, System, or a node's own page now.
-	s.mux.HandleFunc("GET /nodes", s.requireAuth(redirectTo("/")))
+	// Courtesy redirects for old bookmarks — Radio/Connections no longer
+	// exist as standalone pages; everything they offered is reachable
+	// from System or a node's own page now.
 	s.mux.HandleFunc("GET /radio", s.requireAuth(redirectTo("/system")))
 	s.mux.HandleFunc("GET /connections", s.requireAuth(redirectTo("/")))
 }

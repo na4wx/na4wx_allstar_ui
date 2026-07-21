@@ -13,13 +13,17 @@
   {{if .LoggedIn}}
   <header class="topbar">
     <span class="brand">NA4WX Allstar Dashboard</span>
-    <nav>
+    <button type="button" class="nav-toggle" data-nav-toggle aria-label="Menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav data-nav>
       <a href="/">Home</a>
+      <a href="/nodes">Nodes</a>
       <a href="/stats">Status</a>
       <a href="/system">System</a>
       <a href="/config">Raw Config</a>
-      <form action="/logout" method="post" style="display:inline">
-        <button type="submit" style="margin-left:1.25rem">Log out</button>
+      <form action="/logout" method="post">
+        <button type="submit">Log out</button>
       </form>
     </nav>
   </header>

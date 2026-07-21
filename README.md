@@ -6,20 +6,26 @@ Runs as a single self-contained binary directly on the Pi. No Python/Node runtim
 
 ## Features
 
-The UI is three pages: **Home**, **System**, and **Raw Config**.
+The UI is five pages: **Home**, **Nodes**, **Status**, **System**, and **Raw Config**. On a narrow screen the nav collapses behind a hamburger button; every page's own layout is responsive independent of that.
 
 ### Home
 
 - **Live status** per node — an on-air indicator (from `rpt stats`), who's connected right now, and every field app_rpt reports
-- **Connection history** — connected nodes and link activity as tables, keeping the last 10 records of how connections changed
-- **Callsigns** beside node numbers, from AllStarLink's published node directory (downloaded daily)
 - **Link / unlink** another node in one click, via the standard `*3` / `*1` touch-tone commands
 - **Failsafes** for the two states that stop Asterisk starting: a node whose radio device has vanished from its config file, and a driver config file with no devices at all
+
+### Nodes
+
+The fast, no-CLI-calls list for finding, adding, and removing nodes — number, callsign, radio device, and a link to each node's full edit page. Home and Status both shell out to `asterisk -rx` per node to show live state; this page never does, so it stays quick regardless of node count or whether Asterisk is even running.
+
+### Status
+
+Detailed per-node stats (every field `rpt stats` reports) and connection history — connected nodes and link activity as tables, keeping the last 10 records of how connections changed, plus callsigns beside node numbers from AllStarLink's published node directory (downloaded daily).
 
 ### Adding and configuring a node
 
 - **Setup wizard** (`/nodes/new`) asks only for node number, callsign, AllStarLink password, repeater mode, and radio interface, then derives and writes everything else across `rpt.conf`, `extensions.conf`, `iax.conf`, and the radio driver file
-- **Node page** — identity, radio hardware (pick an existing device or create one inline), timing, command/tone set, AllStarLink registration, live link status, DTMF relay (`asterisk -rx "rpt fun <node> <digits>"`), and saved macros
+- **Node page** — tabbed into Setup / Tones & Audio / Network / Live & Commands: identity, radio hardware (pick an existing device or create one inline), timing, command/tone set, a friendly courtesy-tone and sound-file editor (with upload — a WAV is transcoded via `sox` to the format app_rpt expects), AllStarLink registration, live link status, DTMF relay (`asterisk -rx "rpt fun <node> <digits>"`), and saved macros
 - **Command/tone set** — each node gets its own `functions<number>` / `macro<number>` / `telemetry<number>` / `morse<number>` sections, either copied from an existing node or bootstrapped from known-good defaults. This matters: a node whose `functions=` field is blank falls back to a bare `[functions]` section that doesn't exist on a stock HamVoIP install, so it silently accepts no DTMF commands at all
 - **Dialplan entries** — `extensions.conf`'s `radio-secure`, `radio-secure-proxy`, and `radio-iaxrpt` contexts are written on create and removed on delete, with a bulk backfill button on Home for nodes that predate this app
 
