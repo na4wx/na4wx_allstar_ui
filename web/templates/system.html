@@ -103,7 +103,7 @@
     <h2 style="margin:0; color:var(--danger)">{{.}} has no devices — this can block Asterisk from starting</h2>
     {{template "help" "Found the hard way: this HamVoIP build treats any loaded channel driver having no findable device as fatal to the whole Asterisk process, even if no configured node actually uses that driver. An empty usbradio.conf or simpleusb.conf can bring down a node that only uses the other one."}}
   </div>
-  <form method="post" action="/system/radio/{{.}}/placeholder" onsubmit="return confirm('Add a placeholder device to {{.}}? Nothing will actually use it — this only exists so its channel driver can load.')">
+  <form method="post" action="/system/radio/{{.}}/placeholder" data-confirm="Add a placeholder device to {{.}}? Nothing will actually use it — this only exists so its channel driver can load.">
     <div class="actions" style="margin-top:0">
       <button type="submit" class="primary">Add placeholder device &amp; try to bring Asterisk up</button>
     </div>
@@ -128,7 +128,7 @@
         <td>
           <a class="btn" href="/system/radio/{{.File}}/{{.Name}}">Edit</a>
           {{if not .UsedByNode}}
-          <form method="post" action="/system/radio/{{.File}}/{{.Name}}/delete" style="display:inline" onsubmit="return confirm('Delete device {{.Name}} from {{.File}}? This cannot be undone.')">
+          <form method="post" action="/system/radio/{{.File}}/{{.Name}}/delete" style="display:inline" data-confirm="Delete device {{.Name}} from {{.File}}? This cannot be undone." data-confirm-danger>
             <button type="submit" class="danger">Delete</button>
           </form>
           {{end}}
@@ -272,7 +272,7 @@
       </div>
     </div>
     <div class="actions">
-      <button type="submit" class="primary" onclick="return confirm('Send these settings to the radio module now? This transmits AT commands directly over serial to reprogram it.')">Send to radio module</button>
+      <button type="submit" class="primary" data-confirm="Send these settings to the radio module now? This transmits AT commands directly over serial to reprogram it.">Send to radio module</button>
     </div>
   </form>
   {{if $last}}
@@ -300,7 +300,7 @@
         <span style="font-size:0.85rem; color:var(--text-dim)">Restart the whole device</span>
         {{template "help" "Like unplugging and plugging the device back in. Takes about a minute. All radio connections will drop and this page will be unreachable until it comes back up."}}
       </div>
-      <form method="post" action="/system/reboot" onsubmit="return confirm('Restart this device now? Any active radio traffic and connections will drop, and it will take about a minute to come back.')">
+      <form method="post" action="/system/reboot" data-confirm="Restart this device now? Any active radio traffic and connections will drop, and it will take about a minute to come back." data-confirm-danger>
         <button type="submit" class="danger">Reboot device</button>
       </form>
     </div>

@@ -10,7 +10,7 @@
     {{template "help" "This node's radio device is missing from its config file entirely — not misconfigured, just gone. This is what makes Asterisk itself fail to start (chan_simpleusb/chan_usbradio refuses to load with no device to bind to). Something outside this app most likely regenerated the file, e.g. HamVoIP's node-config.sh, which overwrites rpt.conf on every run."}}
   </div>
   <p class="section-intro" style="margin-top:0">Device <strong>{{.MissingDevice.Name}}</strong> is referenced by this node but doesn't exist in <strong>{{.MissingDevice.File}}</strong>.</p>
-  <form method="post" action="/nodes/{{.Node.Number}}/recreate-device" onsubmit="return confirm('Recreate device {{.MissingDevice.Name}} in {{.MissingDevice.File}} with generic starting-point audio levels (500/500)? Your original tuned levels can\'t be recovered — you\'ll likely want to re-tune afterward.')">
+  <form method="post" action="/nodes/{{.Node.Number}}/recreate-device" data-confirm="Recreate device {{.MissingDevice.Name}} in {{.MissingDevice.File}} with generic starting-point audio levels (500/500)? Your original tuned levels can't be recovered — you'll likely want to re-tune afterward." data-confirm-danger>
     <div class="actions" style="margin-top:0">
       <button type="submit" class="primary">Recreate device &amp; try to bring Asterisk up</button>
     </div>

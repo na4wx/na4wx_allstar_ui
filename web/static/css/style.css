@@ -561,3 +561,47 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   header.topbar { padding: 0.75rem 1rem; }
   header.topbar nav a { padding: 0.35rem 0.5rem; font-size: 0.88rem; }
 }
+
+/* Confirmation modal, replacing native confirm() so a prompt before a
+   destructive/consequential action matches the rest of the app instead
+   of browser chrome that varies by OS/browser and can't be styled or
+   trusted to render the same way twice. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  z-index: 200;
+}
+/* An author rule setting `display` on this element would otherwise beat
+   the browser's own `[hidden] { display: none }` rule at equal
+   specificity, silently leaving a "hidden" modal fully visible and
+   blocking the page. This selector combines the class and the
+   attribute, giving it strictly higher specificity so hidden always
+   wins regardless of source order. */
+.modal-backdrop[hidden] {
+  display: none;
+}
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 440px;
+  width: 100%;
+  padding: 1.5rem;
+}
+.modal-card p {
+  margin: 0 0 1.5rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}

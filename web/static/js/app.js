@@ -1,3 +1,123 @@
+// Confirmation modal, replacing native confirm(). confirmModal(message,
+// opts) returns a Promise<boolean> resolving true if the operator
+// confirmed. opts.danger styles the confirm button like a destructive
+// action instead of the default accent color. Built lazily (once, on
+// first use) and reused for every subsequent call, rather than one
+// element per confirm site, since only one confirmation is ever open at
+// a time. The message is set via textContent, never innerHTML, so it
+// can't be misread as allowing markup injection even though every
+// current caller's text is server-rendered, not user input.
+const confirmModal = (function () {
+  let backdrop, messageEl, cancelBtn, okBtn, resolveFn;
+
+  function build() {
+    backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.hidden = true;
+
+    const card = document.createElement("div");
+    card.className = "modal-card";
+    card.setAttribute("role", "alertdialog");
+    card.setAttribute("aria-modal", "true");
+
+    messageEl = document.createElement("p");
+    card.appendChild(messageEl);
+
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = "Cancel";
+    okBtn = document.createElement("button");
+    okBtn.type = "button";
+    actions.appendChild(cancelBtn);
+    actions.appendChild(okBtn);
+    card.appendChild(actions);
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) settle(false);
+    });
+    cancelBtn.addEventListener("click", () => settle(false));
+    okBtn.addEventListener("click", () => settle(true));
+    document.addEventListener("keydown", (e) => {
+      if (backdrop.hidden) return;
+      if (e.key === "Escape") settle(false);
+      else if (e.key === "Enter") settle(true);
+    });
+  }
+
+  function settle(result) {
+    if (!resolveFn) return;
+    backdrop.hidden = true;
+    const resolve = resolveFn;
+    resolveFn = null;
+    resolve(result);
+  }
+
+  return function confirmModal(message, opts) {
+    if (!backdrop) build();
+    opts = opts || {};
+    messageEl.textContent = message;
+    okBtn.className = "btn " + (opts.danger ? "danger" : "primary");
+    okBtn.textContent = opts.okLabel || (opts.danger ? "Delete" : "Confirm");
+    backdrop.hidden = false;
+    okBtn.focus();
+    return new Promise((resolve) => {
+      resolveFn = resolve;
+    });
+  };
+})();
+
+// Generic confirm-before-submit for any form or submit button carrying
+// data-confirm, replacing inline onsubmit/onclick="return confirm(...)"
+// so every confirmation looks like the rest of the app rather than the
+// browser's own dialog chrome. data-confirm-danger marks the action as
+// destructive, styling the modal's confirm button to match.
+//
+// A form is re-submitted via requestSubmit() after confirmation, which
+// re-fires the "submit" event — approvedForms tracks which submission
+// was already confirmed so it's let through exactly once instead of
+// looping back into this same handler. A button instead calls
+// button.form.requestSubmit(button), which respects that button's own
+// formaction/form attributes (e.g. a delete button pointing at a
+// different form, or overriding the enclosing form's action) — the
+// same thing a real click on it would have done.
+(function () {
+  const approvedForms = new WeakSet();
+
+  document.querySelectorAll("form[data-confirm]").forEach((form) => {
+    if (form.hasAttribute("data-ajax-link")) return; // handled inline where it's submitted, see below
+    form.addEventListener("submit", (e) => {
+      if (approvedForms.has(form)) {
+        approvedForms.delete(form);
+        return;
+      }
+      e.preventDefault();
+      confirmModal(form.getAttribute("data-confirm"), {
+        danger: form.hasAttribute("data-confirm-danger"),
+      }).then((ok) => {
+        if (!ok) return;
+        approvedForms.add(form);
+        form.requestSubmit();
+      });
+    });
+  });
+
+  document.querySelectorAll("button[data-confirm]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      confirmModal(btn.getAttribute("data-confirm"), {
+        danger: btn.hasAttribute("data-confirm-danger"),
+      }).then((ok) => {
+        if (ok && btn.form) btn.form.requestSubmit(btn);
+      });
+    });
+  });
+})();
+
 // Polls /api/status and updates the dashboard status pill + stat grid.
 // Plain short-polling rather than SSE/WebSocket: for a handful of scalar
 // values refreshed every few seconds this is simpler and just as
@@ -170,7 +290,7 @@
       e.preventDefault();
 
       const confirmMsg = form.getAttribute("data-confirm");
-      if (confirmMsg && !window.confirm(confirmMsg)) return;
+      if (confirmMsg && !(await confirmModal(confirmMsg, { danger: form.hasAttribute("data-confirm-danger") }))) return;
 
       const result = form.querySelector("[data-link-result]");
       const params = new URLSearchParams(new FormData(form));

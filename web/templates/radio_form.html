@@ -29,7 +29,7 @@
     <button type="submit" class="primary">Save</button>
     <a class="btn" href="/system">Cancel</a>
     <span style="flex:1"></span>
-    <button type="submit" formaction="/system/radio/{{.File}}/{{.Device.Name}}/delete" class="danger" onclick="return confirm('Delete device {{.Device.Name}} from {{.File}}? This cannot be undone.')">Delete device</button>
+    <button type="submit" formaction="/system/radio/{{.File}}/{{.Device.Name}}/delete" class="danger" data-confirm="Delete device {{.Device.Name}} from {{.File}}? This cannot be undone." data-confirm-danger>Delete device</button>
   </div>
 </form>
 {{end}}

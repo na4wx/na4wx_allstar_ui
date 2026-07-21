@@ -178,7 +178,7 @@
           </select>
         </div>
         <div class="field" style="flex:none">
-          <button type="submit" formaction="/nodes/{{.Node.Number}}/clone-config" formnovalidate class="btn" onclick="return confirm('Replace node {{.Node.Number}}\'s command/tone set? This overwrites its current status tones, Morse ID, touch-tone commands, and macros.')">Apply</button>
+          <button type="submit" formaction="/nodes/{{.Node.Number}}/clone-config" formnovalidate class="btn" data-confirm="Replace node {{.Node.Number}}'s command/tone set? This overwrites its current status tones, Morse ID, touch-tone commands, and macros." data-confirm-danger>Apply</button>
         </div>
       </div>
     </div>
@@ -189,7 +189,7 @@
         {{template "help" "Use this if this node was set up by editing HamVoIP's shipped template — its sections may still be named for the template's example node (e.g. functions1998) instead of this one, which means editing or deleting this node here can miss them. Repair copies each set into a section named for this node and points the node at it. It keeps your current commands and tones; it only fixes the names. Safe to run any time — it does nothing if the names are already correct."}}
       </div>
       <div class="hint">Fixes a node whose command/tone sections are named for a different node (common if it was set up by hand from the template). Keeps your current settings — only corrects the names.</div>
-      <button type="submit" formaction="/nodes/{{.Node.Number}}/normalize" formnovalidate class="btn" style="margin-top:0.5rem" onclick="return confirm('Repair node {{.Node.Number}}\'s command/tone section names? This copies its current commands and tones into sections named for this node. Your settings are kept; only the section names change.')">Repair section names</button>
+      <button type="submit" formaction="/nodes/{{.Node.Number}}/normalize" formnovalidate class="btn" style="margin-top:0.5rem" data-confirm="Repair node {{.Node.Number}}'s command/tone section names? This copies its current commands and tones into sections named for this node. Your settings are kept; only the section names change.">Repair section names</button>
     </div>
 
     <details style="margin-top:1rem">
@@ -239,7 +239,7 @@
     <button type="submit" class="primary">Save</button>
     <a class="btn" href="/">Cancel</a>
     <span style="flex:1"></span>
-    <button type="submit" form="delete_node_form" class="danger" onclick="return confirm('Delete node {{.Node.Number}}? This removes it from every config file it appears in, including its radio device (unless another node still uses it). This cannot be undone.')">Delete node</button>
+    <button type="submit" form="delete_node_form" class="danger" data-confirm="Delete node {{.Node.Number}}? This removes it from every config file it appears in, including its radio device (unless another node still uses it). This cannot be undone." data-confirm-danger>Delete node</button>
   </div>
 </form>
 <form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
@@ -365,7 +365,7 @@
     <h2 style="margin:0">Send a touch-tone command now</h2>
     {{template "help" "Sends the sequence below exactly as if it were dialed on the radio itself. Using the quick actions above fills this in for you, or you can type any sequence from the command list below."}}
   </div>
-  <form method="post" action="/nodes/{{.Node.Number}}/dtmf" onsubmit="return confirm('Send this command to node {{.Node.Number}} now? This can connect or disconnect live links.')">
+  <form method="post" action="/nodes/{{.Node.Number}}/dtmf" data-confirm="Send this command to node {{.Node.Number}} now? This can connect or disconnect live links.">
     <div class="row">
       <div class="field">
         <label for="dtmf_digits">Touch-tone sequence</label>
@@ -392,7 +392,7 @@
         <td>{{.Digits}}</td>
         <td>{{.Command}}</td>
         <td>
-          <form method="post" action="/nodes/{{$.Node.Number}}/macros/{{.Digits}}/delete" style="display:inline" onsubmit="return confirm('Delete command {{.Digits}}?')">
+          <form method="post" action="/nodes/{{$.Node.Number}}/macros/{{.Digits}}/delete" style="display:inline" data-confirm="Delete command {{.Digits}}?" data-confirm-danger>
             <button type="submit" class="danger">Delete</button>
           </form>
         </td>
@@ -441,7 +441,7 @@
         <td>{{.Digits}}</td>
         <td>{{.Command}}</td>
         <td>
-          <form method="post" action="/nodes/{{$.Node.Number}}/macrodefs/{{.Digits}}/delete" style="display:inline" onsubmit="return confirm('Delete macro {{.Digits}}?')">
+          <form method="post" action="/nodes/{{$.Node.Number}}/macrodefs/{{.Digits}}/delete" style="display:inline" data-confirm="Delete macro {{.Digits}}?" data-confirm-danger>
             <button type="submit" class="danger">Delete</button>
           </form>
         </td>
