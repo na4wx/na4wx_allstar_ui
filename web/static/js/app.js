@@ -1,3 +1,55 @@
+// Node page tabs: a purely client-side grouping of already-independent
+// form sections (each [data-tab-panel] wraps one or more complete,
+// unmodified forms) into tabs, so switching tabs can never affect what
+// a form submits. The active tab is remembered per node in
+// localStorage, since every form on this page is a traditional POST +
+// full-page redirect, not AJAX -- without this, saving anything on a
+// tab other than the first would silently bounce the operator back to
+// tab one. Progressive enhancement: every panel is plain visible markup
+// with no hiding CSS of its own, so with JS disabled (or before this
+// runs) the page is exactly the old single long page, nothing missing.
+(function () {
+  const panels = document.querySelectorAll("[data-tab-panel]");
+  const tabsBar = document.querySelector(".tabs[data-node-number]");
+  const buttons = document.querySelectorAll("[data-tab-target]");
+  if (!panels.length || !buttons.length) return;
+
+  const storageKey = "hamvoip-node-tab-" + (tabsBar ? tabsBar.getAttribute("data-node-number") : "");
+
+  function activate(tab) {
+    let matched = false;
+    panels.forEach((p) => {
+      const isMatch = p.getAttribute("data-tab-panel") === tab;
+      p.hidden = !isMatch;
+      if (isMatch) matched = true;
+    });
+    if (!matched) {
+      // Unknown/stale stored tab id (e.g. from an older version of this
+      // page) -- fall back to the first tab rather than hiding
+      // everything.
+      panels.forEach((p, i) => (p.hidden = i !== 0));
+      tab = panels[0].getAttribute("data-tab-panel");
+    }
+    buttons.forEach((b) => b.classList.toggle("active", b.getAttribute("data-tab-target") === tab));
+    try {
+      localStorage.setItem(storageKey, tab);
+    } catch (e) {
+      // Private browsing / storage disabled -- tab switching still
+      // works for this page view, it just won't be remembered.
+    }
+  }
+
+  buttons.forEach((b) => {
+    b.addEventListener("click", () => activate(b.getAttribute("data-tab-target")));
+  });
+
+  let initial = null;
+  try {
+    initial = localStorage.getItem(storageKey);
+  } catch (e) {}
+  activate(initial || buttons[0].getAttribute("data-tab-target"));
+})();
+
 // Confirmation modal, replacing native confirm(). confirmModal(message,
 // opts) returns a Promise<boolean> resolving true if the operator
 // confirmed. opts.danger styles the confirm button like a destructive

@@ -605,3 +605,32 @@ table th { color: var(--text-dim); font-weight: 550; font-size: 0.86rem; }
   justify-content: flex-end;
   gap: 0.65rem;
 }
+
+/* Node page tabs. Deliberately no rule here sets `display` on
+   [data-tab-panel] itself — the modal above already hit the bug this
+   avoids: an author rule setting `display` on an element beats the
+   browser's own `[hidden] { display: none }` at equal specificity, so a
+   panel hidden via the `hidden` attribute would silently stay visible.
+   Leaving these panels' display entirely to the browser default keeps
+   `hidden` in full control. */
+.tabs {
+  display: flex;
+  gap: 0.15rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tabs button {
+  border: none;
+  background: none;
+  border-radius: 0;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  font-weight: 550;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tabs button:hover { color: var(--text); background: var(--surface-2); }
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }

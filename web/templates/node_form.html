@@ -32,6 +32,14 @@
   {{range .SoundFiles}}<option value="{{.Ref}}">{{.Ref}}{{if not .Custom}} (built-in){{end}}</option>{{end}}
 </datalist>
 
+<div class="tabs" data-node-number="{{.Node.Number}}">
+  <button type="button" data-tab-target="setup">Setup</button>
+  <button type="button" data-tab-target="tones">Tones &amp; Audio</button>
+  <button type="button" data-tab-target="network">Network</button>
+  <button type="button" data-tab-target="live">Live &amp; Commands</button>
+</div>
+
+<div data-tab-panel="setup">
 <form method="post" action="/nodes/{{.Node.Number}}">
   <div class="card">
     <h2>Node identity</h2>
@@ -246,7 +254,9 @@
   </div>
 </form>
 <form id="delete_node_form" method="post" action="/nodes/{{.Node.Number}}/delete"></form>
+</div>
 
+<div data-tab-panel="tones">
 <form method="post" action="/nodes/{{.Node.Number}}/telemetry">
   <div class="card">
     <div class="label-row">
@@ -352,7 +362,9 @@
     </div>
   </div>
 </form>
+</div>
 
+<div data-tab-panel="network">
 <form method="post" action="/nodes/{{.Node.Number}}/registration">
   <div class="card">
     <h2>Connect to the AllStarLink network</h2>
@@ -437,7 +449,9 @@
     </div>
   </div>
 </form>
+</div>
 
+<div data-tab-panel="live">
 <div class="card">
   <div class="label-row">
     <h2 style="margin:0">Who's connected right now</h2>
@@ -607,6 +621,7 @@
       <tr><td>macro,&lt;n&gt;</td><td>Runs a saved sequence of commands in one dial — macros are defined elsewhere in rpt.conf</td></tr>
     </tbody>
   </table>
+</div>
 </div>
 {{end}}
 {{template "layout" .}}
