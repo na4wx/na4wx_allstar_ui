@@ -1099,13 +1099,17 @@
   <p class="hint">No WX courtesy tone mappings configured yet.</p>
   {{end}}
 
+  {{if .SoundCTKeys}}
   <form method="post" action="/nodes/{{.Node.Number}}/automation/wxtone" style="margin-top:1rem">
     <div class="row">
       <div class="field">
-        <label for="wxtone_ctkey">Courtesy tone key</label>
+        <div class="label-row">
+          <label for="wxtone_ctkey">Courtesy tone key</label>
+          {{template "help" "Only courtesy tones already set to a custom sound file are listed — this feature swaps a file's content, so it can't manage one still set to a tone-generator value. Change one to a sound file on the Tones & Audio tab first if the one you want isn't here."}}
+        </div>
         <select id="wxtone_ctkey" name="wxtone_ctkey" required>
           <option value="">Choose one</option>
-          {{range .CTKeys}}<option value="{{.}}">{{.}}</option>{{end}}
+          {{range .SoundCTKeys}}<option value="{{.}}">{{.}}</option>{{end}}
         </select>
       </div>
       <div class="field">
@@ -1121,6 +1125,9 @@
       <button type="submit" class="primary">Add WX courtesy tone</button>
     </div>
   </form>
+  {{else}}
+  <p class="hint">None of this node's courtesy tones are currently set to a custom sound file, so there's nothing this feature can manage yet — set one on the <code>Tones &amp; Audio</code> tab first (a courtesy tone using a raw tone-generator value can't be swapped, only a sound file reference can).</p>
+  {{end}}
 
   <p class="hint" style="margin-top:1rem">AlertScript's own command/DTMF mappings, SkywarnPlus's own courtesy-tone/ID swap, and its ID-recording swap aren't managed here — see the <a href="https://github.com/Mason10198/SkywarnPlus">upstream documentation</a> and edit its config.yaml directly for those.</p>
   {{end}}

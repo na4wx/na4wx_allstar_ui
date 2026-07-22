@@ -152,3 +152,45 @@ func TestApplyWXToneNoopWhenSourceIsDestination(t *testing.T) {
 		t.Errorf("content changed unexpectedly: %q", got)
 	}
 }
+
+// TestPopulateNodeWXTonesOnlyOffersSoundModeCTKeys reproduces the exact
+// reported bug: with ct1 in "sound" mode and ct2 still a tone-generator
+// value, the picker (data.SoundCTKeys) must offer only ct1 -- offering
+// ct2 as a choice that's then always rejected on submit is the actual
+// defect, not the rejection itself. Built by calling
+// s.resolveCTDestPath per key (the exact function
+// handleNodeWXToneSave itself calls), so this list can never silently
+// drift from what submitting the form actually accepts.
+func TestPopulateNodeWXTonesOnlyOffersSoundModeCTKeys(t *testing.T) {
+	asteriskDir := t.TempDir()
+	customDir := t.TempDir()
+
+	fixture := "[telemetry2000]\n" +
+		"ct1=" + filepath.Join(customDir, "ct1") + "\n" +
+		"ct2=|t(650,0,100,2048)(770,0,100,2048)\n" +
+		"cmdmode=|t(1000,0,100,2048)\n" +
+		"\n" +
+		"[2000]\n" +
+		"rxchannel = SimpleUSB/usb\n" +
+		"duplex = 4\n" +
+		"telemetry = telemetry2000\n"
+	if err := os.WriteFile(filepath.Join(asteriskDir, config.RptConfFile), []byte(fixture), 0644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	writeCustomSound(t, customDir, "ct1", "ct1-bytes")
+
+	store := config.NewStore(asteriskDir)
+	soundsStore := sounds.New(customDir, filepath.Join(t.TempDir(), "stock-does-not-exist"), "sox")
+	s := &Server{store: store, sounds: soundsStore, wxTones: wxtone.New(filepath.Join(t.TempDir(), "wx-tones.json"))}
+
+	node, err := s.store.LoadNode("2000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := nodeFormData{Node: node, SkywarnInstalled: true, CTKeys: []string{"ct1", "ct2"}}
+	s.populateNodeWXTones(&data)
+
+	if len(data.SoundCTKeys) != 1 || data.SoundCTKeys[0] != "ct1" {
+		t.Fatalf("SoundCTKeys = %v, want only [ct1] (ct2 is a tone-generator value and must not be offered)", data.SoundCTKeys)
+	}
+}

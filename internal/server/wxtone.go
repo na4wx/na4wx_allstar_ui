@@ -110,10 +110,11 @@ func (s *Server) resolveCTDestPath(node *config.Node, ctKey string) (string, err
 	if !found {
 		return "", fmt.Errorf("%s is no longer present in this node's telemetry section", ctKey)
 	}
-	if _, ok := config.ParseSingleTone(value); ok {
-		return "", fmt.Errorf("%s is a tone-generator value, not a sound file — pick a custom sound file for it on the Tones & Audio tab first", ctKey)
-	}
 	if config.IsToneValue(value) {
+		// Covers both a friendly single "|t(f1,f2,dur,amp)" tone and a raw
+		// multi-segment courtesy tone (several "(...)" groups back to
+		// back) -- ParseSingleTone's own stricter one-segment match is a
+		// subset of this, so checking IsToneValue alone is sufficient.
 		return "", fmt.Errorf("%s is a tone-generator value, not a sound file — pick a custom sound file for it on the Tones & Audio tab first", ctKey)
 	}
 	customFiles, err := s.sounds.ListCustom()
@@ -204,6 +205,18 @@ func (s *Server) populateNodeWXTones(data *nodeFormData) {
 		return
 	}
 	data.WXTones = entries
+
+	// Only offer a CTKey in the picker if it'll actually be accepted --
+	// reuses resolveCTDestPath itself (the exact same check
+	// handleNodeWXToneSave runs) rather than a second, separately
+	// maintained filter that could silently drift out of sync and offer
+	// a key (e.g. one still set to a tone-generator value) that's
+	// guaranteed to be rejected on submit.
+	for _, key := range data.CTKeys {
+		if _, err := s.resolveCTDestPath(data.Node, key); err == nil {
+			data.SoundCTKeys = append(data.SoundCTKeys, key)
+		}
+	}
 }
 
 // handleNodeWXToneSave adds or updates one alert-driven courtesy-tone
