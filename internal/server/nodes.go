@@ -12,6 +12,7 @@ import (
 	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/system"
 	"hamvoipconfiggui/internal/tts"
+	"hamvoipconfiggui/internal/wxtone"
 )
 
 // standardCommandSetSentinel is the "copy_from"/"from" value meaning
@@ -138,6 +139,11 @@ type nodeFormData struct {
 	SkywarnStatus         skywarnplus.Status
 	SkywarnNodeRegistered bool // whether this node's own number is already in SkywarnStatus.Nodes
 	CountyCodeOptions     []skywarnplus.CountyOption
+
+	// WXTones is this node's own alert-driven courtesy-tone mappings —
+	// see internal/wxtone's package doc. Only meaningful once SkywarnPlus
+	// is installed (see populateNodeWXTones).
+	WXTones []wxtone.Entry
 }
 
 // radioChannelOption is one entry in the RX/TX channel dropdown: a
@@ -250,6 +256,7 @@ func (s *Server) renderNodeEditPageWithNode(w http.ResponseWriter, r *http.Reque
 	s.populateNodeAutomation(&data)
 	s.populateNodeSoundSchedule(&data)
 	s.populateNodeSkywarn(r.Context(), &data)
+	s.populateNodeWXTones(&data)
 	s.render(w, "node_form.html", data)
 }
 
@@ -388,6 +395,7 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 		s.populateNodeAutomation(&data)
 		s.populateNodeSoundSchedule(&data)
 		s.populateNodeSkywarn(r.Context(), &data)
+		s.populateNodeWXTones(&data)
 		s.render(w, "node_form.html", data)
 		return
 	}
@@ -658,6 +666,10 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	// internal/soundschedule), so nothing above cleans them up.
 	if err := s.soundSchedule.DeleteByNode(number); err != nil {
 		failed = append(failed, "scheduled sound playback: "+err.Error())
+	}
+	// Same for WX courtesy-tone mappings (see internal/wxtone).
+	if err := s.wxTones.DeleteByNode(number); err != nil {
+		failed = append(failed, "WX courtesy tone mappings: "+err.Error())
 	}
 	if len(failed) > 0 {
 		s.renderHome(w, r, flash("error", "Node "+number+" deleted, but some related config wasn't fully cleaned up: "+strings.Join(failed, "; ")+" — check manually via Raw Config."))

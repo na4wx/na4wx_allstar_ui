@@ -71,12 +71,36 @@ def save(config):
         yaml.dump(config, f)
 
 
+def _active_alert_count(config):
+    # Reads SkywarnPlus's own runtime state file (plain JSON, written by
+    # every SkywarnPlus.py cron run -- not config.yaml, no ruamel.yaml
+    # needed) rather than re-fetching NWS alerts ourselves: SkywarnPlus
+    # already fetches and filters these to the operator's own configured
+    # county codes (see its own get_alerts(COUNTY_CODES)), so this is
+    # read-only reuse of work already done, not a second alert source
+    # that could disagree with the first. Best-effort: a missing or
+    # malformed state file (SkywarnPlus hasn't run yet, or its own
+    # TmpDir was customized) reads as "no active alerts" rather than an
+    # error -- failing safe to "normal" mode, never assuming WX from data
+    # we couldn't actually read.
+    tmpdir = (config.get("DEV", {}) or {}).get("TmpDir", "/tmp/SkywarnPlus")
+    data_file = Path(tmpdir) / "data.json"
+    try:
+        with open(str(data_file), "r") as f:
+            state = json.load(f)
+        return len(state.get("active_alerts") or [])
+    except Exception:
+        return 0
+
+
 def cmd_status():
     config = load()
     alerting = config.get("Alerting", {}) or {}
     tailmessage = config.get("Tailmessage", {}) or {}
     asterisk = config.get("Asterisk", {}) or {}
     alertscript = config.get("AlertScript", {}) or {}
+    courtesytones = config.get("CourtesyTones", {}) or {}
+    idchange = config.get("IDChange", {}) or {}
     pushover = config.get("Pushover", {}) or {}
     skydescribe = config.get("SkyDescribe", {}) or {}
     codes = alerting.get("CountyCodes") or []
@@ -100,6 +124,9 @@ def cmd_status():
         "sayallclear": bool(alerting.get("SayAllClear", False)),
         "tailmessage": bool(tailmessage.get("Enable", False)),
         "alertscript": bool(alertscript.get("Enable", False)),
+        "courtesytone_enable": bool(courtesytones.get("Enable", False)),
+        "idchange_enable": bool(idchange.get("Enable", False)),
+        "active_alert_count": _active_alert_count(config),
         "countycodes": plain_codes,
         "nodes": nodes,
         "pushover": {

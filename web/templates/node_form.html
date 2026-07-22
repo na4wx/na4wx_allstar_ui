@@ -250,6 +250,9 @@
         {{template "help" "The voice or Morse recording that identifies your station by callsign — required periodically by FCC rules. Typically |i followed by your callsign for a built-in voice, or pick/upload a custom recording in Tones & Audio below."}}
       </div>
       <input type="text" id="idrecording" name="idrecording" value="{{.Node.IDRecording}}" list="sound_files" placeholder="|iyourcallsign or a sound file name">
+      {{if and .SkywarnInstalled .SkywarnStatus.IDSwapEnabled}}
+      <p class="hint">SkywarnPlus's own ID swap is enabled — the file this points at may change automatically during an alert. See the Automation tab.</p>
+      {{end}}
     </div>
   </div>
 
@@ -304,6 +307,9 @@
       <h2 style="margin:0">Tones &amp; audio ({{.TelemetrySect}})</h2>
       {{template "help" "Courtesy tones, status beeps, and sound-file playback for this node. Each entry either plays a tone (frequency/duration/amplitude) or a named sound file — app_rpt accepts either in any of these fields, so this shows whichever this entry currently is."}}
     </div>
+    {{if and .SkywarnInstalled .SkywarnStatus.CourtesyToneSwapEnabled}}
+    <p class="hint">SkywarnPlus's own courtesy-tone swap is enabled — one of these files may change automatically during an alert. See the Automation tab.</p>
+    {{end}}
     {{if .TelemetryRows}}
     <table>
       <thead><tr><th>Event</th><th>Setting</th></tr></thead>
@@ -1066,7 +1072,55 @@
     </div>
   </form>
 
-  <p class="hint" style="margin-top:1rem">AlertScript's own command/DTMF mappings and the courtesy-tone/ID swap during alerts aren't managed here — see the <a href="https://github.com/Mason10198/SkywarnPlus">upstream documentation</a> and edit its config.yaml directly for those.</p>
+  <h2 style="margin-top:1.25rem">WX courtesy tone</h2>
+  {{template "help" "A safer alternative to SkywarnPlus's own courtesy-tone swap: this app checks SkywarnPlus's own active-alert count itself and swaps a courtesy tone's sound file when it changes — never touching rpt.conf, so it takes effect immediately with no Asterisk restart. Only works for a courtesy tone key currently set to a custom sound file (not a tone-generator string) on the Tones & Audio tab."}}
+  {{if .WXTones}}
+  <table>
+    <thead><tr><th>Courtesy tone</th><th>Normal sound</th><th>WX sound</th><th>Current</th><th></th></tr></thead>
+    <tbody>
+      {{range .WXTones}}
+      <tr>
+        <td>{{.CTKey}}</td>
+        <td>{{.NormalSound}}</td>
+        <td>{{.WXSound}}</td>
+        <td>{{if eq .Mode "wx"}}WX{{else}}Normal{{end}}</td>
+        <td>
+          <form method="post" action="/nodes/{{$.Node.Number}}/automation/wxtone/{{.ID}}/delete" style="display:inline" data-confirm="Remove this WX courtesy tone mapping?" data-confirm-danger>
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No WX courtesy tone mappings configured yet.</p>
+  {{end}}
+
+  <form method="post" action="/nodes/{{.Node.Number}}/automation/wxtone" style="margin-top:1rem">
+    <div class="row">
+      <div class="field">
+        <label for="wxtone_ctkey">Courtesy tone key</label>
+        <select id="wxtone_ctkey" name="wxtone_ctkey" required>
+          <option value="">Choose one</option>
+          {{range .CTKeys}}<option value="{{.}}">{{.}}</option>{{end}}
+        </select>
+      </div>
+      <div class="field">
+        <label for="wxtone_normal">Normal sound</label>
+        <input type="text" id="wxtone_normal" name="wxtone_normal" list="sound_files" placeholder="a sound file name" required>
+      </div>
+      <div class="field">
+        <label for="wxtone_wx">WX sound</label>
+        <input type="text" id="wxtone_wx" name="wxtone_wx" list="sound_files" placeholder="a sound file name" required>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Add WX courtesy tone</button>
+    </div>
+  </form>
+
+  <p class="hint" style="margin-top:1rem">AlertScript's own command/DTMF mappings, SkywarnPlus's own courtesy-tone/ID swap, and its ID-recording swap aren't managed here — see the <a href="https://github.com/Mason10198/SkywarnPlus">upstream documentation</a> and edit its config.yaml directly for those.</p>
   {{end}}
 </div>
 </div>

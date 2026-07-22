@@ -23,12 +23,18 @@
 //
 // This app deliberately doesn't manage AlertScript's own Mappings list
 // (letting the operator configure arbitrary shell/DTMF commands that run
-// automatically on an external trigger is a meaningfully different,
-// more advanced feature than everything else here) or the
+// automatically on an external trigger is a meaningfully different, more
+// advanced feature than everything else here) or SkywarnPlus's own
 // courtesy-tone/ID swap during alerts (that would mean SkywarnPlus and
-// this app independently rewriting the same rpt.conf telemetry
-// sections) — both stay manual, edited via SkywarnPlus's own config.yaml
-// directly.
+// this app independently rewriting the same file) — both stay manual,
+// edited via SkywarnPlus's own config.yaml directly. Status does read
+// (never write) whether SkywarnPlus's own swap is enabled, purely so the
+// UI can warn before an operator edits a file SkywarnPlus might change
+// out from under them. internal/wxtone is this app's own safer
+// alternative: it reads SkywarnPlus's already-fetched active-alert count
+// (see Status.ActiveAlertCount) and performs the same kind of courtesy-tone
+// swap itself, fully tracked and visible in this app rather than an
+// uncoordinated second process.
 package skywarnplus
 
 import (
@@ -70,6 +76,22 @@ type Status struct {
 	Nodes       []string
 	Pushover    PushoverStatus
 	SkyDescribe SkyDescribeStatus
+
+	// CourtesyToneSwapEnabled/IDSwapEnabled report whether SkywarnPlus's
+	// own courtesy-tone/ID swap (CourtesyTones.Enable / IDChange.Enable
+	// in its config.yaml) is turned on — this app never configures that
+	// swap itself (see this package's doc comment for why), but surfaces
+	// it read-only so the UI can warn before an operator edits a file
+	// SkywarnPlus might change out from under them.
+	CourtesyToneSwapEnabled bool
+	IDSwapEnabled           bool
+
+	// ActiveAlertCount is how many weather alerts SkywarnPlus currently
+	// has active for the operator's configured county codes, read
+	// straight from its own already-fetched runtime state (see
+	// GetStatus's doc comment) — not a second alert source this app
+	// fetches itself.
+	ActiveAlertCount int
 }
 
 // PushoverStatus is SkywarnPlus's Pushover push-notification settings.
@@ -123,14 +145,17 @@ func GetStatus(ctx context.Context, dir string) (Status, error) {
 		return Status{}, err
 	}
 	var raw struct {
-		Enable      bool     `json:"enable"`
-		SayAlert    bool     `json:"sayalert"`
-		SayAllClear bool     `json:"sayallclear"`
-		Tailmessage bool     `json:"tailmessage"`
-		AlertScript bool     `json:"alertscript"`
-		CountyCodes []string `json:"countycodes"`
-		Nodes       []string `json:"nodes"`
-		Pushover    struct {
+		Enable             bool     `json:"enable"`
+		SayAlert           bool     `json:"sayalert"`
+		SayAllClear        bool     `json:"sayallclear"`
+		Tailmessage        bool     `json:"tailmessage"`
+		AlertScript        bool     `json:"alertscript"`
+		CourtesyToneEnable bool     `json:"courtesytone_enable"`
+		IDChangeEnable     bool     `json:"idchange_enable"`
+		ActiveAlertCount   int      `json:"active_alert_count"`
+		CountyCodes        []string `json:"countycodes"`
+		Nodes              []string `json:"nodes"`
+		Pushover           struct {
 			Enable   bool   `json:"enable"`
 			UserKey  string `json:"userkey"`
 			APIToken string `json:"apitoken"`
@@ -148,13 +173,16 @@ func GetStatus(ctx context.Context, dir string) (Status, error) {
 		return Status{}, fmt.Errorf("parse sky_configure.py status output: %w", err)
 	}
 	return Status{
-		Enable:      raw.Enable,
-		SayAlert:    raw.SayAlert,
-		SayAllClear: raw.SayAllClear,
-		Tailmessage: raw.Tailmessage,
-		AlertScript: raw.AlertScript,
-		CountyCodes: raw.CountyCodes,
-		Nodes:       raw.Nodes,
+		Enable:                  raw.Enable,
+		SayAlert:                raw.SayAlert,
+		SayAllClear:             raw.SayAllClear,
+		Tailmessage:             raw.Tailmessage,
+		AlertScript:             raw.AlertScript,
+		CourtesyToneSwapEnabled: raw.CourtesyToneEnable,
+		IDSwapEnabled:           raw.IDChangeEnable,
+		ActiveAlertCount:        raw.ActiveAlertCount,
+		CountyCodes:             raw.CountyCodes,
+		Nodes:                   raw.Nodes,
 		Pushover: PushoverStatus{
 			Enable:   raw.Pushover.Enable,
 			UserKey:  raw.Pushover.UserKey,

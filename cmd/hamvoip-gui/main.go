@@ -38,6 +38,7 @@ func main() {
 	ttsTool := flag.String("tts-tool", "piper", "path to the Piper text-to-speech binary, or bare name if it's on PATH (used by the \"Create from text\" sound generator); install.sh sets this up automatically, see internal/tts's package doc for exactly what it installs and why")
 	ttsVoicesDir := flag.String("tts-voices-dir", "/etc/hamvoip-gui/piper-voices", "directory holding downloaded Piper voice models (.onnx files); install.sh downloads one default voice here automatically, more are available at https://huggingface.co/rhasspy/piper-voices — empty until at least one is downloaded")
 	skywarnDir := flag.String("skywarn-dir", "/usr/local/bin/SkywarnPlus", "directory holding an operator-installed copy of SkywarnPlus (https://github.com/Mason10198/SkywarnPlus), a third-party weather-alert tool; install.sh sets this up as an opt-in step, this app only ever configures a copy that's already there")
+	wxTonesPath := flag.String("wx-tones-file", "/etc/hamvoip-gui/wx-tones.json", "path to store the operator's own alert-driven courtesy-tone mappings (see internal/wxtone's package doc) — a safer, fully-visible alternative to SkywarnPlus's own courtesy-tone swap")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -62,7 +63,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir, *skywarnDir)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir, *skywarnDir, *wxTonesPath)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
@@ -80,6 +81,11 @@ func main() {
 	// reasoning as StartLinkHistoryPoller for starting it here rather than
 	// in server.New.
 	srv.StartSoundSchedulePoller(context.Background())
+
+	// Swap any configured alert-driven courtesy tones as SkywarnPlus's
+	// active-alert count changes — see internal/wxtone's package doc.
+	// Same reasoning as StartLinkHistoryPoller for starting it here.
+	srv.StartWXTonePoller(context.Background())
 
 	// Node directory: read whatever copy is on disk, and (unless
 	// disabled) keep it current. A download failure is logged and

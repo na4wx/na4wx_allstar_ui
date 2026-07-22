@@ -52,19 +52,23 @@ func fakePython3(t *testing.T, exitOK bool, stdout, stderrMsg string) {
 }
 
 func TestGetStatusSuccess(t *testing.T) {
-	fakePython3(t, true, `{"enable":true,"sayalert":false,"sayallclear":true,"tailmessage":false,"alertscript":true,"countycodes":["ARC125"],"nodes":["2000"],"pushover":{"enable":true,"userkey":"uk","apitoken":"at","debug":true},"skydescribe":{"apikey":"ak","language":"en-gb","speed":5,"voice":"Mary","maxwords":200}}`, "")
+	fakePython3(t, true, `{"enable":true,"sayalert":false,"sayallclear":true,"tailmessage":false,"alertscript":true,"courtesytone_enable":true,"idchange_enable":false,"active_alert_count":3,"countycodes":["ARC125"],"nodes":["2000"],"pushover":{"enable":true,"userkey":"uk","apitoken":"at","debug":true},"skydescribe":{"apikey":"ak","language":"en-gb","speed":5,"voice":"Mary","maxwords":200}}`, "")
 	status, err := GetStatus(context.Background(), "/unused/dir")
 	if err != nil {
 		t.Fatalf("GetStatus() error = %v", err)
 	}
 	want := Status{
 		Enable: true, SayAlert: false, SayAllClear: true, Tailmessage: false, AlertScript: true,
+		CourtesyToneSwapEnabled: true, IDSwapEnabled: false, ActiveAlertCount: 3,
 		CountyCodes: []string{"ARC125"}, Nodes: []string{"2000"},
 		Pushover:    PushoverStatus{Enable: true, UserKey: "uk", APIToken: "at", Debug: true},
 		SkyDescribe: SkyDescribeStatus{APIKey: "ak", Language: "en-gb", Speed: 5, Voice: "Mary", MaxWords: 200},
 	}
 	if status.Enable != want.Enable || status.SayAlert != want.SayAlert || status.SayAllClear != want.SayAllClear || status.Tailmessage != want.Tailmessage || status.AlertScript != want.AlertScript {
 		t.Errorf("scalar fields = %+v, want %+v", status, want)
+	}
+	if status.CourtesyToneSwapEnabled != want.CourtesyToneSwapEnabled || status.IDSwapEnabled != want.IDSwapEnabled || status.ActiveAlertCount != want.ActiveAlertCount {
+		t.Errorf("new fields = %+v, want %+v", status, want)
 	}
 	if len(status.CountyCodes) != 1 || status.CountyCodes[0] != "ARC125" {
 		t.Errorf("CountyCodes = %v", status.CountyCodes)

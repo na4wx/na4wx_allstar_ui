@@ -17,6 +17,7 @@ import (
 	"hamvoipconfiggui/internal/sounds"
 	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/system"
+	"hamvoipconfiggui/internal/wxtone"
 )
 
 const sessionCookie = "hamvoip_gui_session"
@@ -71,6 +72,10 @@ type Server struct {
 	// the Automation tab just checks whether something's there.
 	skywarnDir string
 
+	// wxTones holds the operator's own alert-driven courtesy-tone
+	// mappings — see internal/wxtone's package doc. Always non-nil.
+	wxTones *wxtone.Store
+
 	// restartNeeded tracks whether any Asterisk config file has been
 	// saved since Asterisk was last (re)started — set via
 	// config.Store.SetChangeHook (every save is to an Asterisk/app_rpt
@@ -111,9 +116,11 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 // package doc. ttsTool/ttsVoicesDir configure the "Create from text"
 // sound generator — see internal/tts's package doc. skywarnDir is where
 // an operator-installed copy of SkywarnPlus lives — see
-// internal/skywarnplus's package doc.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath), ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir}
+// internal/skywarnplus's package doc. wxTonesPath is where the
+// operator's own alert-driven courtesy-tone mappings are persisted —
+// see internal/wxtone's package doc.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir, wxTonesPath string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath), ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir, wxTones: wxtone.New(wxTonesPath)}
 	s.live = newLiveHub(s)
 	store.SetChangeHook(func(string) { s.restartNeeded.Store(true) })
 
@@ -202,6 +209,8 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/register", s.requireAuth(s.handleNodeSkywarnRegister))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/pushover", s.requireAuth(s.handleNodeSkywarnPushover))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/skydescribe", s.requireAuth(s.handleNodeSkywarnSkyDescribe))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/wxtone", s.requireAuth(s.handleNodeWXToneSave))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/wxtone/{id}/delete", s.requireAuth(s.handleNodeWXToneDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))

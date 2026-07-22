@@ -307,37 +307,69 @@ func soxInputArgs(ext string) (args []string, ok bool) {
 	}
 }
 
-// previewInfo resolves name to its actual file in the custom directory
-// (whichever recognized extension it's actually stored as) and the sox
-// input args needed to read it. Never touches the stock library — a
-// preview is only ever offered for the operator's own uploaded/generated
-// sounds.
-func (s *Store) previewInfo(name string) (path string, soxArgs []string, err error) {
-	if !ValidName(name) {
-		return "", nil, fmt.Errorf("invalid sound name")
-	}
-	entries, err := os.ReadDir(s.customDir)
+// resolveInDir finds name's actual on-disk file (whichever recognized
+// extension it's actually stored as) within dir.
+func resolveInDir(dir, name string) (string, error) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", nil, fmt.Errorf("sound %q not found", name)
+			return "", fmt.Errorf("sound %q not found", name)
 		}
-		return "", nil, err
+		return "", err
 	}
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
 		ext := strings.ToLower(filepath.Ext(e.Name()))
+		if !soundExtensions[ext] {
+			continue
+		}
 		if strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())) != name {
 			continue
 		}
-		args, ok := soxInputArgs(ext)
-		if !ok {
-			return "", nil, fmt.Errorf("previewing %s files isn't supported", ext)
-		}
-		return filepath.Join(s.customDir, e.Name()), args, nil
+		return filepath.Join(dir, e.Name()), nil
 	}
-	return "", nil, fmt.Errorf("sound %q not found", name)
+	return "", fmt.Errorf("sound %q not found", name)
+}
+
+// ResolveCustomPath finds name's actual on-disk path (with whichever
+// extension it's really stored as) in the custom directory — e.g. for
+// wxtone's file-swap, which needs a real path to copy bytes from/to, not
+// just the extension-less Ref app_rpt itself uses.
+func (s *Store) ResolveCustomPath(name string) (string, error) {
+	if !ValidName(name) {
+		return "", fmt.Errorf("invalid sound name")
+	}
+	return resolveInDir(s.customDir, name)
+}
+
+// ResolveStockPath finds name's actual on-disk path in the read-only
+// stock library — for reading only (e.g. as a wxtone copy source); there
+// is no write path for the stock directory anywhere in this app.
+// Doesn't apply ValidName's custom-upload character restriction: a match
+// only ever comes from resolveInDir's own directory scan (never from
+// building a path directly out of name), so an unusual stock filename
+// can't cause a traversal regardless of its characters.
+func (s *Store) ResolveStockPath(name string) (string, error) {
+	return resolveInDir(s.stockDir, name)
+}
+
+// previewInfo resolves name to its actual file in the custom directory
+// and the sox input args needed to read it. Never touches the stock
+// library — a preview is only ever offered for the operator's own
+// uploaded/generated sounds.
+func (s *Store) previewInfo(name string) (path string, soxArgs []string, err error) {
+	path, err = s.ResolveCustomPath(name)
+	if err != nil {
+		return "", nil, err
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	args, ok := soxInputArgs(ext)
+	if !ok {
+		return "", nil, fmt.Errorf("previewing %s files isn't supported", ext)
+	}
+	return path, args, nil
 }
 
 // Preview transcodes name (one of the operator's own custom sounds) to
