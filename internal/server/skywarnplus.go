@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"hamvoipconfiggui/internal/skywarnplus"
@@ -13,8 +14,11 @@ import (
 // app's own "select over checkbox for an explicit on/off setting"
 // convention (an unchecked checkbox submits nothing at all, which is
 // exactly the kind of ambiguity this app avoids elsewhere) rather than
-// SkyControl.py's own one-key-per-invocation shape.
-var skywarnToggleKeys = []string{"enable", "sayalert", "sayallclear", "tailmessage"}
+// SkyControl.py's own one-key-per-invocation shape. alertscript is just
+// AlertScript's own Enable flag — its Mappings list (arbitrary
+// shell/DTMF commands run automatically per alert type) stays out of
+// scope, edited via config.yaml directly if wanted.
+var skywarnToggleKeys = []string{"enable", "sayalert", "sayallclear", "tailmessage", "alertscript"}
 
 // populateNodeSkywarn fills data's "Weather Alerts" fields from an
 // operator-installed copy of SkywarnPlus, if there is one — see
@@ -156,6 +160,67 @@ func (s *Server) handleNodeSkywarnRegister(w http.ResponseWriter, r *http.Reques
 	}
 	if _, err := skywarnplus.AddNode(r.Context(), s.skywarnDir, number); err != nil {
 		s.renderNodeEditPage(w, r, number, flash("error", "Couldn't register this node with SkywarnPlus: "+err.Error()))
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
+}
+
+// handleNodeSkywarnPushover saves SkywarnPlus's Pushover notification
+// settings in one submission — confirmed self-contained (see
+// skywarnplus.SetPushover's doc comment): once Enable/UserKey/APIToken
+// are set, SkywarnPlus's own run loop sends notifications with no other
+// wiring needed.
+func (s *Server) handleNodeSkywarnPushover(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	enable := r.FormValue("pushover_enable") == "true"
+	debug := r.FormValue("pushover_debug") == "true"
+	userKey := r.FormValue("pushover_userkey")
+	apiToken := r.FormValue("pushover_apitoken")
+	if _, err := skywarnplus.SetPushover(r.Context(), s.skywarnDir, enable, userKey, apiToken, debug); err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "Couldn't save Pushover settings: "+err.Error()))
+		return
+	}
+	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
+}
+
+// handleNodeSkywarnSkyDescribe saves SkyDescribe's connection/voice
+// settings in one submission. This only configures SkyDescribe itself —
+// see skywarnplus.SetSkyDescribe's doc comment for why triggering it
+// (a DTMF command, or an AlertScript mapping) is a separate step this
+// handler doesn't cover.
+func (s *Server) handleNodeSkywarnSkyDescribe(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	speed, err := strconv.Atoi(r.FormValue("skydescribe_speed"))
+	if err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "Speed must be a whole number from -10 to 10"))
+		return
+	}
+	maxWords, err := strconv.Atoi(r.FormValue("skydescribe_maxwords"))
+	if err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "Max words must be a whole number"))
+		return
+	}
+	apiKey := r.FormValue("skydescribe_apikey")
+	language := r.FormValue("skydescribe_language")
+	voice := r.FormValue("skydescribe_voice")
+	if _, err := skywarnplus.SetSkyDescribe(r.Context(), s.skywarnDir, apiKey, language, speed, voice, maxWords); err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "Couldn't save SkyDescribe settings: "+err.Error()))
 		return
 	}
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)

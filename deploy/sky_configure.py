@@ -8,9 +8,11 @@ boolean keys (enable, sayalert, sayallclear, tailmessage, courtesytone,
 idchange, alertscript) via ruamel.yaml, which preserves config.yaml's
 own extensive inline comments on every save -- see SkyControl.py's own
 comment: "Use ruamel.yaml instead of PyYAML to preserve comments in the
-config file". This script covers the two things SkyControl.py does not:
-the two YAML list settings (Alerting.CountyCodes, Asterisk.Nodes), using
-the exact same ruamel.yaml approach so comments stay preserved here too.
+config file". This script covers what SkyControl.py does not: the two
+YAML list settings (Alerting.CountyCodes, Asterisk.Nodes), and the
+Pushover/SkyDescribe sections (string/int fields SkyControl.py's own
+fixed VALID_KEYS boolean-toggle shape can't reach) -- using the exact
+same ruamel.yaml approach so comments stay preserved here too.
 
 Deliberately avoids f-strings and argparse in favor of .format() and
 manual sys.argv parsing, matching SkyControl.py's own style -- HamVoIP's
@@ -22,6 +24,10 @@ Usage:
   sky_configure.py status                  Prints one JSON object to stdout.
   sky_configure.py set-counties C1,C2,...  Replaces Alerting.CountyCodes.
   sky_configure.py add-node <number>       Appends to Asterisk.Nodes if missing.
+  sky_configure.py set-pushover <enable:true|false> <userkey> <apitoken> <debug:true|false>
+                                            Replaces the whole Pushover section.
+  sky_configure.py set-skydescribe <apikey> <language> <speed> <voice> <maxwords>
+                                            Replaces the whole SkyDescribe section.
 
 Exits non-zero with a message on stderr on any failure.
 
@@ -70,6 +76,9 @@ def cmd_status():
     alerting = config.get("Alerting", {}) or {}
     tailmessage = config.get("Tailmessage", {}) or {}
     asterisk = config.get("Asterisk", {}) or {}
+    alertscript = config.get("AlertScript", {}) or {}
+    pushover = config.get("Pushover", {}) or {}
+    skydescribe = config.get("SkyDescribe", {}) or {}
     codes = alerting.get("CountyCodes") or []
 
     # CountyCodes entries can be plain strings or single-key
@@ -90,8 +99,22 @@ def cmd_status():
         "sayalert": bool(alerting.get("SayAlert", False)),
         "sayallclear": bool(alerting.get("SayAllClear", False)),
         "tailmessage": bool(tailmessage.get("Enable", False)),
+        "alertscript": bool(alertscript.get("Enable", False)),
         "countycodes": plain_codes,
         "nodes": nodes,
+        "pushover": {
+            "enable": bool(pushover.get("Enable", False)),
+            "userkey": str(pushover.get("UserKey", "")),
+            "apitoken": str(pushover.get("APIToken", "")),
+            "debug": bool(pushover.get("Debug", False)),
+        },
+        "skydescribe": {
+            "apikey": str(skydescribe.get("APIKey", "")),
+            "language": str(skydescribe.get("Language", "en-us")),
+            "speed": int(skydescribe.get("Speed", 0)),
+            "voice": str(skydescribe.get("Voice", "John")),
+            "maxwords": int(skydescribe.get("MaxWords", 150)),
+        },
     }
     print(json.dumps(status))
 
@@ -130,9 +153,38 @@ def cmd_add_node(node):
     print("OK")
 
 
+def _parse_bool(value):
+    return value.strip().lower() == "true"
+
+
+def cmd_set_pushover(enable_arg, userkey, apitoken, debug_arg):
+    config = load()
+    pushover = config.setdefault("Pushover", {})
+    pushover["Enable"] = _parse_bool(enable_arg)
+    pushover["UserKey"] = userkey
+    pushover["APIToken"] = apitoken
+    pushover["Debug"] = _parse_bool(debug_arg)
+    save(config)
+    print("OK")
+
+
+def cmd_set_skydescribe(apikey, language, speed_arg, voice, maxwords_arg):
+    config = load()
+    skydescribe = config.setdefault("SkyDescribe", {})
+    skydescribe["APIKey"] = apikey
+    skydescribe["Language"] = language
+    skydescribe["Speed"] = int(speed_arg)
+    skydescribe["Voice"] = voice
+    skydescribe["MaxWords"] = int(maxwords_arg)
+    save(config)
+    print("OK")
+
+
 def main():
     if len(sys.argv) < 2:
-        sys.stderr.write("Usage: sky_configure.py <status|set-counties|add-node> [args]\n")
+        sys.stderr.write(
+            "Usage: sky_configure.py <status|set-counties|add-node|set-pushover|set-skydescribe> [args]\n"
+        )
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -149,6 +201,22 @@ def main():
                 sys.stderr.write("Usage: sky_configure.py add-node <number>\n")
                 sys.exit(1)
             cmd_add_node(sys.argv[2])
+        elif cmd == "set-pushover":
+            if len(sys.argv) != 6:
+                sys.stderr.write(
+                    "Usage: sky_configure.py set-pushover <enable> <userkey> <apitoken> <debug>\n"
+                )
+                sys.exit(1)
+            cmd_set_pushover(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+        elif cmd == "set-skydescribe":
+            if len(sys.argv) != 7:
+                sys.stderr.write(
+                    "Usage: sky_configure.py set-skydescribe <apikey> <language> <speed> <voice> <maxwords>\n"
+                )
+                sys.exit(1)
+            cmd_set_skydescribe(
+                sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+            )
         else:
             sys.stderr.write("Unknown command: {}\n".format(cmd))
             sys.exit(1)

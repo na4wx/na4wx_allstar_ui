@@ -200,6 +200,8 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/counties", s.requireAuth(s.handleNodeSkywarnAddCounty))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/counties/{code}/delete", s.requireAuth(s.handleNodeSkywarnDeleteCounty))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/register", s.requireAuth(s.handleNodeSkywarnRegister))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/pushover", s.requireAuth(s.handleNodeSkywarnPushover))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/skydescribe", s.requireAuth(s.handleNodeSkywarnSkyDescribe))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))

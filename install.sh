@@ -334,3 +334,7 @@ log "Deploying"
 ./deploy/install.sh "$REPO_ROOT/bin/hamvoip-gui"
 
 log "Done"
+
+echo "This script installed the HamVoIP GUI and its dependencies (already running via systemd). If you installed SkywarnPlus, finish its setup on the node's Automation tab."
+echo "Visit http://<node-ip>:8088 in a browser to access the GUI."
+echo "You can re-run this script later to update the GUI and its dependencies, or to install SkywarnPlus if you skipped it."

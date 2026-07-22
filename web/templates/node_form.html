@@ -930,6 +930,16 @@
           <option value="false" {{if not .SkywarnStatus.Tailmessage}}selected{{end}}>Off</option>
         </select>
       </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="skywarn_alertscript">AlertScript</label>
+          {{template "help" "Runs SkywarnPlus's own AlertScript automation — which shell/DTMF commands run for which alerts is configured in its config.yaml directly, not here."}}
+        </div>
+        <select id="skywarn_alertscript" name="alertscript">
+          <option value="true" {{if .SkywarnStatus.AlertScript}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.AlertScript}}selected{{end}}>Off</option>
+        </select>
+      </div>
     </div>
     <div class="actions">
       <button type="submit" class="primary">Save weather alert settings</button>
@@ -981,7 +991,82 @@
     </div>
   </form>
 
-  <p class="hint" style="margin-top:1rem">Advanced features (AlertScript, Pushover, SkyDescribe, courtesy-tone/ID swap during alerts) aren't managed here — see the <a href="https://github.com/Mason10198/SkywarnPlus">upstream documentation</a> and edit its config.yaml directly for those.</p>
+  <h2 style="margin-top:1.25rem">Pushover notifications</h2>
+  {{template "help" "Sends weather alert notifications to your phone or other devices via Pushover (pushover.net) — free, but needs your own account."}}
+  <form method="post" action="/nodes/{{.Node.Number}}/automation/skywarn/pushover" style="margin-top:0.5rem">
+    <div class="row">
+      <div class="field">
+        <label for="pushover_enable">Pushover notifications</label>
+        <select id="pushover_enable" name="pushover_enable">
+          <option value="true" {{if .SkywarnStatus.Pushover.Enable}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.Pushover.Enable}}selected{{end}}>Off</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="pushover_debug">Verbose messages</label>
+          {{template "help" "Includes extra detail (which counties/alerts changed) in each notification."}}
+        </div>
+        <select id="pushover_debug" name="pushover_debug">
+          <option value="true" {{if .SkywarnStatus.Pushover.Debug}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.Pushover.Debug}}selected{{end}}>Off</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="pushover_userkey">User key</label>
+        <input type="password" id="pushover_userkey" name="pushover_userkey" value="{{.SkywarnStatus.Pushover.UserKey}}" placeholder="from pushover.net">
+      </div>
+      <div class="field">
+        <label for="pushover_apitoken">API token</label>
+        <input type="password" id="pushover_apitoken" name="pushover_apitoken" value="{{.SkywarnStatus.Pushover.APIToken}}" placeholder="from your Pushover application">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save Pushover settings</button>
+    </div>
+  </form>
+
+  <h2 style="margin-top:1.25rem">SkyDescribe (detailed alert descriptions)</h2>
+  {{template "help" "Reads the full NWS description of an alert aloud using the VoiceRSS text-to-speech service — needs your own free API key from VoiceRSS.org. This only configures SkyDescribe; trigger it with a DTMF command on the Live & Commands tab (e.g. running SkyDescribe.py with an alert number), or via AlertScript's own config.yaml mappings."}}
+  <form method="post" action="/nodes/{{.Node.Number}}/automation/skywarn/skydescribe" style="margin-top:0.5rem">
+    <div class="row">
+      <div class="field">
+        <label for="skydescribe_apikey">VoiceRSS API key</label>
+        <input type="password" id="skydescribe_apikey" name="skydescribe_apikey" value="{{.SkywarnStatus.SkyDescribe.APIKey}}" placeholder="from VoiceRSS.org">
+      </div>
+      <div class="field">
+        <label for="skydescribe_language">Language</label>
+        <input type="text" id="skydescribe_language" name="skydescribe_language" value="{{.SkywarnStatus.SkyDescribe.Language}}" placeholder="en-us">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <div class="label-row">
+          <label for="skydescribe_speed">Speed</label>
+          {{template "help" "-10 (slowest) to 10 (fastest)."}}
+        </div>
+        <input type="number" id="skydescribe_speed" name="skydescribe_speed" value="{{.SkywarnStatus.SkyDescribe.Speed}}" min="-10" max="10" placeholder="1">
+      </div>
+      <div class="field">
+        <label for="skydescribe_voice">Voice</label>
+        <input type="text" id="skydescribe_voice" name="skydescribe_voice" value="{{.SkywarnStatus.SkyDescribe.Voice}}" placeholder="John">
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="skydescribe_maxwords">Max words</label>
+          {{template "help" "Caps how much of a long alert description gets read, to avoid exceeding your node's transmit timeout. ~130 words is about 60 seconds."}}
+        </div>
+        <input type="number" id="skydescribe_maxwords" name="skydescribe_maxwords" value="{{.SkywarnStatus.SkyDescribe.MaxWords}}" min="1" placeholder="150">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save SkyDescribe settings</button>
+    </div>
+  </form>
+
+  <p class="hint" style="margin-top:1rem">AlertScript's own command/DTMF mappings and the courtesy-tone/ID swap during alerts aren't managed here — see the <a href="https://github.com/Mason10198/SkywarnPlus">upstream documentation</a> and edit its config.yaml directly for those.</p>
   {{end}}
 </div>
 </div>
