@@ -18,7 +18,11 @@ const soundUploadMaxBytes = 20 << 20
 
 // espeakFallbackTool is used when Piper cannot run on older system
 // libraries but text-to-speech is still desired.
-const espeakFallbackTool = "espeak-ng"
+const (
+	espeakFallbackEngine = "espeak"
+	espeakNGTool         = "espeak-ng"
+	espeakTool           = "espeak"
+)
 
 // telemetryRow is one entry in the "Tones & Audio" editor. Mode is
 // decided from the entry's actual current value, not its key name —
@@ -184,6 +188,16 @@ func findVoiceByName(voices []tts.Voice, name string) (tts.Voice, bool) {
 	return tts.Voice{}, false
 }
 
+func (s *Server) resolveESpeakTool(ctx context.Context) (tool string, errMsg string) {
+	if out, err := tts.CheckTool(ctx, espeakNGTool, "--version"); err == nil {
+		return espeakNGTool, ""
+	} else if _, err := tts.CheckTool(ctx, espeakTool, "--version"); err == nil {
+		return espeakTool, ""
+	} else {
+		return "", formatTTSError("Text-to-speech is unavailable because neither espeak-ng nor espeak could start", out)
+	}
+}
+
 // resolveTTSBackend chooses which engine this request/page should use:
 // Piper first when healthy and voices exist, otherwise espeak-ng.
 func (s *Server) resolveTTSBackend(ctx context.Context) (engine string, voices []tts.Voice, note string, errMsg string) {
@@ -196,23 +210,23 @@ func (s *Server) resolveTTSBackend(ctx context.Context) (engine string, voices [
 		}
 	}
 
-	espeakCheckOut, espeakCheckErr := tts.CheckTool(ctx, espeakFallbackTool, "--version")
-	if espeakCheckErr == nil {
-		espeakVoices, espeakVoiceOut, espeakVoicesErr := tts.ListESpeakVoices(ctx, espeakFallbackTool)
+	espeakRuntimeTool, espeakErrMsg := s.resolveESpeakTool(ctx)
+	if espeakErrMsg == "" {
+		espeakVoices, espeakVoiceOut, espeakVoicesErr := tts.ListESpeakVoices(ctx, espeakRuntimeTool)
 		if espeakVoicesErr == nil {
 			note := ""
 			if piperErr != "" {
-				note = "Using espeak-ng fallback because Piper is unavailable on this system."
+				note = "Using espeak fallback because Piper is unavailable on this system."
 			}
-			return "espeak-ng", espeakVoices, note, ""
+			return espeakFallbackEngine, espeakVoices, note, ""
 		}
 		return "", nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng voices could not be listed", espeakVoiceOut)
 	}
 
 	if piperErr != "" {
-		return "", nil, "", "Text-to-speech is unavailable. " + piperErr + " " + formatTTSError("espeak-ng also couldn't start", espeakCheckOut)
+		return "", nil, "", "Text-to-speech is unavailable. " + piperErr + " " + espeakErrMsg
 	}
-	return "", nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng couldn't start", espeakCheckOut)
+	return "", nil, "", espeakErrMsg
 }
 
 func (s *Server) synthesizeWithEngine(ctx context.Context, engine, voiceName, text string) (wav []byte, output string, userErr string, err error) {
@@ -231,18 +245,19 @@ func (s *Server) synthesizeWithEngine(ctx context.Context, engine, voiceName, te
 		wav, output, err = tts.Synthesize(ctx, s.ttsTool, voice.ModelPath, text)
 		return wav, output, "", err
 
-	case "espeak-ng":
-		if checkOut, checkErr := tts.CheckTool(ctx, espeakFallbackTool, "--version"); checkErr != nil {
-			return nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng couldn't start", checkOut), nil
+	case espeakFallbackEngine:
+		espeakRuntimeTool, espeakErrMsg := s.resolveESpeakTool(ctx)
+		if espeakErrMsg != "" {
+			return nil, "", espeakErrMsg, nil
 		}
-		espeakVoices, espeakVoiceOut, listErr := tts.ListESpeakVoices(ctx, espeakFallbackTool)
+		espeakVoices, espeakVoiceOut, listErr := tts.ListESpeakVoices(ctx, espeakRuntimeTool)
 		if listErr != nil {
 			return nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng voices could not be listed", espeakVoiceOut), nil
 		}
 		if _, ok := findVoiceByName(espeakVoices, voiceName); !ok {
 			return nil, "", "Pick a voice — none selected, or it's no longer available", nil
 		}
-		wav, output, err = tts.SynthesizeESpeak(ctx, espeakFallbackTool, voiceName, text)
+		wav, output, err = tts.SynthesizeESpeak(ctx, espeakRuntimeTool, voiceName, text)
 		return wav, output, "", err
 
 	default:
@@ -250,7 +265,7 @@ func (s *Server) synthesizeWithEngine(ctx context.Context, engine, voiceName, te
 		if msg != "" {
 			return nil, "", msg, nil
 		}
-		if resolvedEngine == "espeak-ng" && len(voices) > 0 && voiceName == "" {
+		if resolvedEngine == espeakFallbackEngine && len(voices) > 0 && voiceName == "" {
 			voiceName = voices[0].Name
 		}
 		return s.synthesizeWithEngine(ctx, resolvedEngine, voiceName, text)

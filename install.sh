@@ -46,7 +46,24 @@ command -v git >/dev/null 2>&1 || { log "Installing git"; pacman_install git; }
 command -v make >/dev/null 2>&1 || { log "Installing make"; pacman_install make; }
 command -v curl >/dev/null 2>&1 || { log "Installing curl"; pacman_install curl; }
 command -v tar >/dev/null 2>&1 || { log "Installing tar"; pacman_install tar; }
-command -v espeak-ng >/dev/null 2>&1 || { log "Installing espeak-ng (TTS fallback)"; pacman_install espeak-ng; }
+
+if ! command -v espeak-ng >/dev/null 2>&1 && ! command -v espeak >/dev/null 2>&1; then
+	log "Installing espeak fallback (espeak-ng/espeak)"
+	set +e
+	pacman_install espeak-ng
+	ESPEAK_INSTALL_STATUS=$?
+	set -e
+	if [ "$ESPEAK_INSTALL_STATUS" != "0" ]; then
+		log "espeak-ng package not found; trying espeak"
+		set +e
+		pacman_install espeak
+		ESPEAK_INSTALL_STATUS=$?
+		set -e
+		if [ "$ESPEAK_INSTALL_STATUS" != "0" ]; then
+			log "warning: couldn't install espeak fallback package (tried espeak-ng and espeak). Text-to-speech fallback may be unavailable unless one is installed manually."
+		fi
+	fi
+fi
 
 version_ge() { # version_ge A B => A >= B
 	[ "$1" = "$2" ] && return 0
