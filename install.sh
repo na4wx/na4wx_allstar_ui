@@ -99,6 +99,92 @@ if [ "$need_go_install" = "1" ]; then
 	fi
 fi
 
+# --- Piper (text-to-speech, for the "Create from text" sound generator) ----
+#
+# Piper's current, actively maintained project (OHF-Voice/piper1-gpl) only
+# ships as a pip wheel with no standalone binary, and only for 64-bit ARM
+# (aarch64) — no package at all for 32-bit ARM. That's a worse fit here
+# than its predecessor project's last release, both because this app's own
+# internal/tts package already shells out to a standalone
+# "piper --model ... --output_file ..." binary (confirmed against the OLD
+# release specifically — the new pip package uses a different, incompatible
+# "python3 -m piper -m ... -f ..." invocation) and because HamVoIP
+# explicitly supports 32-bit ARM (Pi Zero/1/2) as a first-class target,
+# which only the old release covers. That repo is archived (frozen since
+# Oct 2025) so it won't see updates, but for an offline-only local tool
+# with no network exposure that's an acceptable tradeoff — it's the only
+# option that (a) works on 32-bit ARM and (b) matches this app's existing,
+# already-tested invocation with no code changes.
+
+log "Checking Piper (text-to-speech)"
+
+PIPER_RELEASE_VERSION="2023.11.14-2"
+PIPER_INSTALL_DIR="/usr/local/lib/piper"
+PIPER_VOICES_DIR="/etc/hamvoip-gui/piper-voices"
+PIPER_VOICE="en_US-lessac-medium"
+PIPER_VOICE_PATH="en/en_US/lessac/medium/en_US-lessac-medium"
+
+PIPER_ARCH=""
+case "$(uname -m)" in
+	aarch64|arm64)
+		PIPER_ARCH="aarch64" ;;
+	armv7l)
+		PIPER_ARCH="armv7l" ;;
+	armv6l|arm)
+		log "Piper has no build for 32-bit armv6 (Pi Zero/1) — skipping. Everything else in this app works normally; just the \"Create from text\" sound generator won't be available."
+		;;
+	*)
+		log "Piper has no known build for $(uname -m) — skipping text-to-speech setup."
+		;;
+esac
+
+if [ -n "$PIPER_ARCH" ]; then
+	if [ -x "$PIPER_INSTALL_DIR/piper" ]; then
+		log "Piper already installed at $PIPER_INSTALL_DIR/piper"
+	else
+		log "Installing Piper ($PIPER_ARCH)"
+		TMP=$(mktemp -d)
+		if curl -fsSL -o "$TMP/piper.tar.gz" "https://github.com/rhasspy/piper/releases/download/$PIPER_RELEASE_VERSION/piper_linux_${PIPER_ARCH}.tar.gz"; then
+			# The tarball's own top-level directory is "piper/", which is
+			# also PIPER_INSTALL_DIR's basename — extracting straight into
+			# its parent lands it exactly where it needs to be, no rename.
+			rm -rf "$PIPER_INSTALL_DIR"
+			tar -C "$(dirname "$PIPER_INSTALL_DIR")" -xzf "$TMP/piper.tar.gz"
+			# piper needs the .so files and espeak-ng-data/ that ship
+			# alongside it in the same directory (it locates them via an
+			# $ORIGIN-relative rpath, confirmed present in the binary) — so
+			# this symlinks just the executable, not a copy, keeping it
+			# next to everything it depends on.
+			ln -sf "$PIPER_INSTALL_DIR/piper" /usr/local/bin/piper
+			log "Installed Piper to $PIPER_INSTALL_DIR (symlinked to /usr/local/bin/piper)"
+		else
+			log "warning: couldn't download Piper (offline?) — skipping. Re-run this script with network access to pick it up, or set up text-to-speech manually later."
+		fi
+		rm -rf "$TMP"
+	fi
+
+	if [ -x "$PIPER_INSTALL_DIR/piper" ]; then
+		mkdir -p "$PIPER_VOICES_DIR"
+		if [ -f "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx" ]; then
+			log "Voice $PIPER_VOICE already downloaded"
+		else
+			log "Downloading default voice: $PIPER_VOICE"
+			# Staged as .tmp and only renamed into place once both files
+			# succeed, so a connection drop mid-download can never leave a
+			# half-downloaded .onnx file that a re-run would mistake for
+			# "already downloaded".
+			if curl -fsSL -o "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx.tmp" "https://huggingface.co/rhasspy/piper-voices/resolve/main/$PIPER_VOICE_PATH.onnx" \
+				&& curl -fsSL -o "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx.json" "https://huggingface.co/rhasspy/piper-voices/resolve/main/$PIPER_VOICE_PATH.onnx.json"; then
+				mv "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx.tmp" "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx"
+				log "Downloaded voice $PIPER_VOICE to $PIPER_VOICES_DIR (more voices at https://huggingface.co/rhasspy/piper-voices)"
+			else
+				rm -f "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx.tmp" "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx.json"
+				log "warning: couldn't download the default Piper voice (offline?) — the \"Create from text\" sound generator will show no voices until one is downloaded. Re-run this script with network access, or see https://huggingface.co/rhasspy/piper-voices"
+			fi
+		fi
+	fi
+fi
+
 # --- pull latest ---------------------------------------------------------
 
 log "Fetching latest from git"

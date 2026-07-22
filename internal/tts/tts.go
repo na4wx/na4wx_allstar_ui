@@ -1,13 +1,24 @@
-// Package tts generates sound files from typed text using Piper
-// (https://github.com/OHF-Voice/piper1-gpl) — a free, fully offline
-// neural text-to-speech engine with a documented, well-supported
-// Raspberry Pi target, matching this app's whole approach of shelling
-// out to real local tools (sox, 818-prog, asterisk itself) rather than
-// depending on a cloud service or API key. Piper needs a downloaded
-// voice model (a ".onnx" file, plus a same-named ".onnx.json" config it
-// reads automatically) for each voice; this package only lists whichever
-// models already exist in the configured voices directory and runs the
-// piper binary against one — it never downloads voices itself.
+// Package tts generates sound files from typed text using Piper — a
+// free, fully offline neural text-to-speech engine, matching this app's
+// whole approach of shelling out to real local tools (sox, 818-prog,
+// asterisk itself) rather than depending on a cloud service or API key.
+//
+// Specifically this shells out to the standalone "piper" binary from
+// rhasspy/piper's last release (https://github.com/rhasspy/piper,
+// archived — development moved to OHF-Voice/piper1-gpl, but that
+// project ships only as a pip package with a different, incompatible
+// CLI and no 32-bit ARM build at all, a worse fit for a HamVoIP install
+// that may be a Pi Zero/1/2). install.sh provisions this exact binary
+// (see its own Piper section for the download details); this package
+// just invokes it — "piper --model <path> --output_file <path>" with
+// text on stdin, confirmed against that binary's own documented usage.
+//
+// Piper needs a downloaded voice model (a ".onnx" file, plus a
+// same-named ".onnx.json" config it reads automatically) for each
+// voice; this package only lists whichever models already exist in the
+// configured voices directory and runs the piper binary against one —
+// it never downloads voices itself (install.sh downloads one default
+// voice; more are available at https://huggingface.co/rhasspy/piper-voices).
 package tts
 
 import (

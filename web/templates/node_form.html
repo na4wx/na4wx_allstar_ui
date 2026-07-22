@@ -445,7 +445,7 @@
     </div>
   </form>
   {{else}}
-  <p class="hint">No text-to-speech voices downloaded yet. Download one on the Pi with, for example, <code>python3 -m piper.download_voices en_US-lessac-medium</code>, then reload this page.</p>
+  <p class="hint">No text-to-speech voices downloaded yet. Re-run this app's <code>install.sh</code> on the Pi to fetch Piper and a default voice automatically, or download a specific voice manually into <code>/etc/hamvoip-gui/piper-voices/</code> from <a href="https://huggingface.co/rhasspy/piper-voices">huggingface.co/rhasspy/piper-voices</a> (both the <code>.onnx</code> file and its matching <code>.onnx.json</code>), then reload this page.</p>
   {{end}}
 </div>
 </div>
