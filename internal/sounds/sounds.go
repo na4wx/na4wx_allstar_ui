@@ -58,10 +58,21 @@ type File struct {
 	// identified in the UI.
 	Name string
 	// Ref is exactly what app_rpt/rpt.conf wants written into a field
-	// like idrecording or a telemetry value to play this file, e.g.
-	// "node-id" for a custom file or "rpt/callproceeding" for a stock
-	// one (both without an extension — Asterisk appends whichever
-	// format it actually wants at playback time).
+	// like idrecording or a telemetry value to play this file (always
+	// without an extension — Asterisk appends whichever format it
+	// actually wants at playback time). A stock file uses a bare
+	// "rpt/callproceeding"-style reference because /var/lib/asterisk/
+	// sounds/rpt is on Asterisk's own default sound search path — but a
+	// custom file is not on that path at all (it lives in a
+	// HamVoIP-specific directory, e.g. /etc/asterisk/local), and
+	// AllStarLink's own docs are explicit that anything outside the
+	// default tree needs a full absolute path or Asterisk will silently
+	// fail to find it (confirmed the hard way: a bare custom-file
+	// reference saved as idrecording, or handed to "rpt localplay",
+	// simply produces no audio and no error — the file is never found in
+	// the first place). So Ref is an absolute path
+	// (/etc/asterisk/local/node-id) for a custom file, but stays a bare
+	// rpt/-prefixed name for a stock one.
 	Ref string
 	// Custom is true for a file in the custom (uploadable/manageable)
 	// directory, false for a stock library file (read-only reference).
@@ -88,8 +99,11 @@ func New(customDir, stockDir, soxTool string) *Store {
 // name — a real sound is often stored in more than one format (e.g. both
 // callproceeding.gsm and a .ulaw copy), and app_rpt's own reference to
 // it never includes an extension, so from this app's perspective those
-// are one sound, not two.
-func listDir(dir string, custom bool, refPrefix string) ([]File, error) {
+// are one sound, not two. refFor builds each entry's Ref from its bare
+// name — a plain prefix isn't enough since a custom file's Ref needs a
+// full path built from dir itself, not a fixed string (see File.Ref's
+// doc comment).
+func listDir(dir string, custom bool, refFor func(name string) string) ([]File, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -112,24 +126,27 @@ func listDir(dir string, custom bool, refPrefix string) ([]File, error) {
 			continue
 		}
 		seen[name] = true
-		out = append(out, File{Name: name, Ref: refPrefix + name, Custom: custom})
+		out = append(out, File{Name: name, Ref: refFor(name), Custom: custom})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
 }
 
-// ListCustom lists the operator's own uploaded/managed sounds.
+// ListCustom lists the operator's own uploaded/managed sounds. Ref is a
+// full absolute path (see File.Ref's doc comment for why a bare name
+// doesn't work here).
 func (s *Store) ListCustom() ([]File, error) {
-	return listDir(s.customDir, true, "")
+	return listDir(s.customDir, true, func(name string) string { return filepath.Join(s.customDir, name) })
 }
 
 // ListStock lists app_rpt's own prompt library, read-only. Ref is
 // prefixed "rpt/" to match how those prompts are actually referenced
 // elsewhere in rpt.conf (e.g. "patchup=rpt/callproceeding") — this
 // assumes the stock directory is app_rpt's own "rpt" sound subdirectory,
-// true on every HamVoIP install this app has been run against.
+// on Asterisk's own default sound search path, true on every HamVoIP
+// install this app has been run against.
 func (s *Store) ListStock() ([]File, error) {
-	return listDir(s.stockDir, false, "rpt/")
+	return listDir(s.stockDir, false, func(name string) string { return "rpt/" + name })
 }
 
 // ListAll returns custom sounds first (what an operator is most likely

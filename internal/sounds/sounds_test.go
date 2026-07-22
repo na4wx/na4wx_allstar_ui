@@ -36,8 +36,12 @@ func TestListCustomMatchesRealDirectory(t *testing.T) {
 	if len(files) != 1 || files[0].Name != "node-id" {
 		t.Fatalf("got %+v, want exactly [node-id]", files)
 	}
-	if files[0].Ref != "node-id" || !files[0].Custom {
-		t.Errorf("got %+v, want Ref=node-id Custom=true", files[0])
+	// Ref must be a full path, not a bare name -- /etc/asterisk/local (or
+	// wherever the custom dir is) isn't on Asterisk's own default sound
+	// search path, so a bare reference silently fails to play at all.
+	wantRef := filepath.Join(dir, "node-id")
+	if files[0].Ref != wantRef || !files[0].Custom {
+		t.Errorf("got %+v, want Ref=%q Custom=true", files[0], wantRef)
 	}
 }
 
