@@ -144,15 +144,6 @@ type nodeFormData struct {
 	// see internal/wxtone's package doc. Only meaningful once SkywarnPlus
 	// is installed (see populateNodeWXTones).
 	WXTones []wxtone.Entry
-
-	// SoundCTKeys is the subset of CTKeys that resolveCTDestPath actually
-	// accepts (currently set to one of this app's own custom sound files,
-	// not a tone-generator string or a stock/untracked reference) — the
-	// only valid choices for a new WX courtesy tone mapping. Computed by
-	// calling that exact same validation function per key, so this list
-	// can never drift out of sync with what handleNodeWXToneSave will
-	// actually accept.
-	SoundCTKeys []string
 }
 
 // radioChannelOption is one entry in the RX/TX channel dropdown: a

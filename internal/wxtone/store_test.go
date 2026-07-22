@@ -24,7 +24,7 @@ func TestListOnMissingFileIsEmptyNotError(t *testing.T) {
 
 func TestSaveAddsNewEntryWithGeneratedIDAndDefaultMode(t *testing.T) {
 	s := New(newTestStorePath(t))
-	if err := s.Save(Entry{Node: "2000", CTKey: "ct1", NormalSound: "ct1-normal", WXSound: "ct1-storm"}); err != nil {
+	if err := s.Save(Entry{Node: "2000", CTKey: "ct1", NormalType: TypeSound, NormalSound: "ct1-normal", WXType: TypeSound, WXSound: "ct1-storm"}); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := s.List()
@@ -47,13 +47,13 @@ func TestSaveAddsNewEntryWithGeneratedIDAndDefaultMode(t *testing.T) {
 
 func TestSaveUpdatesExistingByID(t *testing.T) {
 	s := New(newTestStorePath(t))
-	if err := s.Save(Entry{Node: "2000", CTKey: "ct1", NormalSound: "a", WXSound: "b"}); err != nil {
+	if err := s.Save(Entry{Node: "2000", CTKey: "ct1", NormalType: TypeSound, NormalSound: "a", WXType: TypeSound, WXSound: "b"}); err != nil {
 		t.Fatal(err)
 	}
 	entries, _ := s.List()
 	id := entries[0].ID
 
-	if err := s.Save(Entry{ID: id, Node: "2000", CTKey: "ct1", NormalSound: "a2", WXSound: "b2"}); err != nil {
+	if err := s.Save(Entry{ID: id, Node: "2000", CTKey: "ct1", NormalType: TypeSound, NormalSound: "a2", WXType: TypeSound, WXSound: "b2"}); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := s.List()
@@ -65,6 +65,55 @@ func TestSaveUpdatesExistingByID(t *testing.T) {
 	}
 	if entries[0].NormalSound != "a2" || entries[0].WXSound != "b2" {
 		t.Fatalf("entries[0] = %+v, want updated fields", entries[0])
+	}
+}
+
+func TestSaveToneTypeEntry(t *testing.T) {
+	s := New(newTestStorePath(t))
+	e := Entry{
+		Node: "2000", CTKey: "ct2",
+		NormalType: TypeTone, NormalTone: "|t(660,0,150,2048)",
+		WXType: TypeTone, WXTone: "|t(650,0,100,2048)(770,0,100,2048)",
+	}
+	if err := s.Save(e); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("List = %v, want 1 entry", entries)
+	}
+	got := entries[0]
+	if got.NormalType != TypeTone || got.NormalTone != "|t(660,0,150,2048)" {
+		t.Errorf("Normal side = %+v", got)
+	}
+	if got.WXType != TypeTone || got.WXTone != "|t(650,0,100,2048)(770,0,100,2048)" {
+		t.Errorf("WX side = %+v", got)
+	}
+}
+
+func TestSaveMixedTypeEntry(t *testing.T) {
+	s := New(newTestStorePath(t))
+	e := Entry{
+		Node: "2000", CTKey: "ct3",
+		NormalType: TypeSound, NormalSound: "ct3-normal",
+		WXType: TypeTone, WXTone: "|t(650,0,100,2048)",
+	}
+	if err := s.Save(e); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := s.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := entries[0]
+	if got.NormalType != TypeSound || got.NormalSound != "ct3-normal" {
+		t.Errorf("Normal side = %+v", got)
+	}
+	if got.WXType != TypeTone || got.WXTone != "|t(650,0,100,2048)" {
+		t.Errorf("WX side = %+v", got)
 	}
 }
 

@@ -59,6 +59,28 @@ func AsteriskRestart(ctx context.Context, bin string) error {
 	return err
 }
 
+// AsteriskReloadRpt live-reloads app_rpt's own config (rpt.conf) — NOT
+// the same operation as AsteriskRestart. Confirmed against app_rpt's own
+// source (apps/app_rpt.c): the module's reload callback flags each
+// still-configured node, and that node's own already-running processing
+// loop picks it up inline — flushing any telemetry currently queued,
+// then reloading that node's config vars — without closing its channel
+// or dropping an active link/keyed state. Used for a change (like a
+// courtesy-tone value swap) where a full restart would be needlessly
+// disruptive. Tries the plain "rpt reload" CLI form first; a real
+// AllStarLink forum thread confirms ASL3 renamed this to "module reload
+// app_rpt", so this falls back to that form rather than assume which
+// one a given HamVoIP install actually has — same "try the common case,
+// fall back rather than guess" shape as install.sh's own
+// espeak-ng-then-espeak handling.
+func AsteriskReloadRpt(ctx context.Context, bin string) error {
+	if _, err := AsteriskRX(ctx, bin, "rpt reload"); err == nil {
+		return nil
+	}
+	_, err := AsteriskRX(ctx, bin, "module reload app_rpt")
+	return err
+}
+
 // RptLocalPlay plays a sound file over node's own local RF output only —
 // confirmed by a real operator's report that it plays out the repeater's
 // own transmitter, but it never reaches any node currently linked to this

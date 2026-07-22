@@ -4,16 +4,23 @@
 // that one stays out of scope): rather than a second, uncoordinated
 // process silently overwriting a sound file, this app's own ticker (see
 // internal/server's StartWXTonePoller) reads SkywarnPlus's own
-// already-fetched active-alert count and performs the same kind of file
-// swap itself, fully tracked here.
+// already-fetched active-alert count and applies the desired Normal/WX
+// state itself, fully tracked here.
 //
-// Deliberately never touches rpt.conf's own ctX= value — every entry's
-// CTKey must already point at a custom sound file (validated at save
-// time), and only that file's on-disk bytes are ever swapped, matching
-// SkyControl.py's own changeCT technique. Changing rpt.conf itself would
-// require an Asterisk restart to take effect in this app (see
-// internal/server's restartNeeded flag), which is far too disruptive to
-// trigger automatically every time a weather alert starts or clears.
+// Each of Normal/WX is independently either a synthesized tone (a
+// "|t(f1,f2,dur,amp)" value app_rpt generates in real time) or a sound
+// file, the operator's choice. Which one determines how a swap is
+// actually applied (see internal/server's applyWXTone):
+//   - sound file -> sound file: only the destination file's on-disk
+//     bytes are swapped, matching SkyControl.py's own changeCT
+//     technique — rpt.conf's own ctX= value is never touched, so this
+//     takes effect immediately with zero Asterisk involvement.
+//   - anything involving a tone: rpt.conf's ctX= value itself is
+//     rewritten, followed by a live app_rpt reload (system.
+//     AsteriskReloadRpt) — NOT the same as a full Asterisk restart (see
+//     that function's doc comment for why a reload is safe here: verified
+//     against app_rpt's own source that it doesn't drop an active link
+//     or keyed state, unlike a restart).
 package wxtone
 
 import (
@@ -25,12 +32,18 @@ import (
 	"sync"
 )
 
-// Mode values track which sound is currently applied to an entry's
-// CTKey destination file, so the poller only copies a file when the
-// desired mode actually differs from what's already there.
+// Mode values track which of Normal/WX is currently applied to an
+// entry's CTKey, so the poller only acts when the desired mode actually
+// differs from what's already there.
 const (
 	ModeNormal = "normal"
 	ModeWX     = "wx"
+)
+
+// Type values say what a Normal or WX state actually is.
+const (
+	TypeTone  = "tone"  // NormalTone/WXTone holds a raw "|t(f1,f2,dur,amp)" value
+	TypeSound = "sound" // NormalSound/WXSound holds an internal/sounds File.Name
 )
 
 // Entry is one alert-driven courtesy-tone mapping.
@@ -39,13 +52,17 @@ type Entry struct {
 	Node  string `json:"node"`
 	CTKey string `json:"ct_key"` // e.g. "ct1" -- one of this node's existing courtesy-tone keys
 
-	// NormalSound/WXSound are internal/sounds File.Name values (custom or
-	// stock), the sources copied onto CTKey's own destination file
-	// depending on whether SkywarnPlus currently has an active alert.
-	NormalSound string `json:"normal_sound"`
-	WXSound     string `json:"wx_sound"`
+	// NormalType/WXType is TypeTone or TypeSound, chosen independently
+	// per state -- see this package's doc comment for how that changes
+	// the way a swap is actually applied.
+	NormalType  string `json:"normal_type"`
+	NormalSound string `json:"normal_sound,omitempty"` // set when NormalType == TypeSound
+	NormalTone  string `json:"normal_tone,omitempty"`  // set when NormalType == TypeTone
+	WXType      string `json:"wx_type"`
+	WXSound     string `json:"wx_sound,omitempty"`
+	WXTone      string `json:"wx_tone,omitempty"`
 
-	// Mode is which sound is currently applied -- ModeNormal or ModeWX,
+	// Mode is which state is currently applied -- ModeNormal or ModeWX,
 	// defaulting to ModeNormal for a freshly-created entry (matching
 	// SkywarnPlus's own "initialize to normal" first-run behavior).
 	Mode string `json:"mode"`

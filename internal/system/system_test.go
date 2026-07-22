@@ -1,6 +1,7 @@
 package system
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,5 +154,67 @@ func TestSetHostnameRejectsInvalid(t *testing.T) {
 		if !hostnameRe.MatchString(h) {
 			t.Errorf("hostnameRe unexpectedly rejected valid hostname %q", h)
 		}
+	}
+}
+
+// fakeAsterisk writes a fake "asterisk" binary to a temp dir that logs
+// every "-rx <cmd>" it's called with (one per line) to logPath, and
+// exits 0 only for a command in okCmds -- everything else exits 1,
+// matching how a real "rpt reload" would fail on an ASL3 box that only
+// understands "module reload app_rpt" (or vice versa).
+func fakeAsterisk(t *testing.T, logPath string, okCmds ...string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "asterisk")
+	script := "#!/bin/sh\n" +
+		"cmd=\"$2\"\n" +
+		"echo \"$cmd\" >> " + logPath + "\n" +
+		"case \"$cmd\" in\n"
+	for _, c := range okCmds {
+		script += "  \"" + c + "\") exit 0 ;;\n"
+	}
+	script += "  *) exit 1 ;;\nesac\n"
+	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake asterisk: %v", err)
+	}
+	return path
+}
+
+func TestAsteriskReloadRptTriesPlainFormFirst(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	bin := fakeAsterisk(t, logPath, "rpt reload")
+	if err := AsteriskReloadRpt(context.Background(), bin); err != nil {
+		t.Fatalf("AsteriskReloadRpt() error = %v", err)
+	}
+	calls, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(calls)); got != "rpt reload" {
+		t.Fatalf("calls = %q, want just \"rpt reload\" (no fallback needed)", got)
+	}
+}
+
+func TestAsteriskReloadRptFallsBackToModuleReload(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	bin := fakeAsterisk(t, logPath, "module reload app_rpt")
+	if err := AsteriskReloadRpt(context.Background(), bin); err != nil {
+		t.Fatalf("AsteriskReloadRpt() error = %v", err)
+	}
+	calls, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "rpt reload\nmodule reload app_rpt"
+	if got := strings.TrimSpace(string(calls)); got != want {
+		t.Fatalf("calls = %q, want %q (tried plain form, then fell back)", got, want)
+	}
+}
+
+func TestAsteriskReloadRptReturnsErrorWhenBothFail(t *testing.T) {
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	bin := fakeAsterisk(t, logPath) // no okCmds -- everything fails
+	if err := AsteriskReloadRpt(context.Background(), bin); err == nil {
+		t.Fatal("AsteriskReloadRpt() error = nil, want an error when both forms fail")
 	}
 }

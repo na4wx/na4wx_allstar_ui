@@ -442,6 +442,32 @@ const confirmModal = (function () {
   apply();
 })();
 
+// Generalized version of the toggle above for a page with more than one
+// independent radio group (e.g. the WX courtesy tone form's separate
+// Normal/WX "tone" vs "sound file" choices) -- each radio's own name
+// attribute is the group key, so any number of groups can share this one
+// block instead of duplicating the IIFE per group. A section is shown
+// when data-type-toggle-section="<radio name>:<radio value>" matches the
+// checked radio in that name's group.
+(function () {
+  const radios = document.querySelectorAll("[data-type-toggle]");
+  if (!radios.length) return;
+  const groups = new Set();
+  radios.forEach((r) => groups.add(r.name));
+  function apply() {
+    groups.forEach((name) => {
+      const checked = document.querySelector(`[data-type-toggle][name="${name}"]:checked`);
+      const value = checked ? checked.value : "";
+      document.querySelectorAll(`[data-type-toggle-section^="${name}:"]`).forEach((section) => {
+        const sectionValue = section.getAttribute("data-type-toggle-section").split(":")[1];
+        section.style.display = sectionValue === value ? "" : "none";
+      });
+    });
+  }
+  radios.forEach((r) => r.addEventListener("change", apply));
+  apply();
+})();
+
 // Connections page "quick action" buttons: fills the DTMF sequence
 // field with <prefix><target node>, so the operator can review it
 // before sending rather than the click sending anything directly.

@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"hamvoipconfiggui/internal/config"
@@ -41,6 +43,23 @@ func writeCustomSound(t *testing.T, customDir, name, content string) {
 	if err := os.WriteFile(filepath.Join(customDir, name+".ulaw"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// fakeAsterisk writes a fake "asterisk" binary to a temp dir that logs
+// every "-rx <cmd>" it's called with (one per line) to logPath and
+// exits 0 unconditionally -- mirrors internal/system's own fakeAsterisk
+// test double, simplified since these tests only need to observe that
+// AsteriskReloadRpt's plain "rpt reload" form was actually invoked, not
+// exercise its own fallback logic (already covered in internal/system).
+func fakeAsterisk(t *testing.T, logPath string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "asterisk")
+	script := "#!/bin/sh\necho \"$2\" >> " + logPath + "\nexit 0\n"
+	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake asterisk: %v", err)
+	}
+	return path
 }
 
 func TestResolveCTDestPathSoundMode(t *testing.T) {
@@ -107,9 +126,13 @@ func TestApplyWXToneSwapsFileContent(t *testing.T) {
 	ct1Ref := filepath.Join(customDir, "ct1")
 	rewriteFixtureCT1(t, s, ct1Ref)
 
-	entry := wxtone.Entry{Node: "2000", CTKey: "ct1", NormalSound: "normal-tone", WXSound: "wx-tone"}
+	entry := wxtone.Entry{
+		Node: "2000", CTKey: "ct1",
+		NormalType: wxtone.TypeSound, NormalSound: "normal-tone",
+		WXType: wxtone.TypeSound, WXSound: "wx-tone",
+	}
 
-	if err := s.applyWXTone(entry, wxtone.ModeWX); err != nil {
+	if err := s.applyWXTone(context.Background(), entry, wxtone.ModeWX); err != nil {
 		t.Fatalf("applyWXTone(WX) error = %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(customDir, "ct1.ulaw"))
@@ -120,7 +143,7 @@ func TestApplyWXToneSwapsFileContent(t *testing.T) {
 		t.Errorf("after WX swap, dest content = %q, want %q", got, "WX")
 	}
 
-	if err := s.applyWXTone(entry, wxtone.ModeNormal); err != nil {
+	if err := s.applyWXTone(context.Background(), entry, wxtone.ModeNormal); err != nil {
 		t.Fatalf("applyWXTone(Normal) error = %v", err)
 	}
 	got, err = os.ReadFile(filepath.Join(customDir, "ct1.ulaw"))
@@ -140,8 +163,12 @@ func TestApplyWXToneNoopWhenSourceIsDestination(t *testing.T) {
 	ct1Ref := filepath.Join(customDir, "ct1")
 	rewriteFixtureCT1(t, s, ct1Ref)
 
-	entry := wxtone.Entry{Node: "2000", CTKey: "ct1", NormalSound: "ct1", WXSound: "does-not-matter"}
-	if err := s.applyWXTone(entry, wxtone.ModeNormal); err != nil {
+	entry := wxtone.Entry{
+		Node: "2000", CTKey: "ct1",
+		NormalType: wxtone.TypeSound, NormalSound: "ct1",
+		WXType: wxtone.TypeSound, WXSound: "does-not-matter",
+	}
+	if err := s.applyWXTone(context.Background(), entry, wxtone.ModeNormal); err != nil {
 		t.Fatalf("applyWXTone() error = %v, want no error when source equals destination", err)
 	}
 	got, err := os.ReadFile(filepath.Join(customDir, "ct1.ulaw"))
@@ -153,44 +180,127 @@ func TestApplyWXToneNoopWhenSourceIsDestination(t *testing.T) {
 	}
 }
 
-// TestPopulateNodeWXTonesOnlyOffersSoundModeCTKeys reproduces the exact
-// reported bug: with ct1 in "sound" mode and ct2 still a tone-generator
-// value, the picker (data.SoundCTKeys) must offer only ct1 -- offering
-// ct2 as a choice that's then always rejected on submit is the actual
-// defect, not the rejection itself. Built by calling
-// s.resolveCTDestPath per key (the exact function
-// handleNodeWXToneSave itself calls), so this list can never silently
-// drift from what submitting the form actually accepts.
-func TestPopulateNodeWXTonesOnlyOffersSoundModeCTKeys(t *testing.T) {
-	asteriskDir := t.TempDir()
-	customDir := t.TempDir()
-
-	fixture := "[telemetry2000]\n" +
-		"ct1=" + filepath.Join(customDir, "ct1") + "\n" +
-		"ct2=|t(650,0,100,2048)(770,0,100,2048)\n" +
-		"cmdmode=|t(1000,0,100,2048)\n" +
-		"\n" +
-		"[2000]\n" +
-		"rxchannel = SimpleUSB/usb\n" +
-		"duplex = 4\n" +
-		"telemetry = telemetry2000\n"
-	if err := os.WriteFile(filepath.Join(asteriskDir, config.RptConfFile), []byte(fixture), 0644); err != nil {
-		t.Fatalf("write fixture: %v", err)
+// TestPopulateNodeWXTonesOffersEveryCTKey confirms the picker no longer
+// filters down to sound-mode-only keys (see this package's git history
+// for the short-lived SoundCTKeys restriction) -- once a tone-type
+// state is possible, any existing ctX key is a valid starting point,
+// since its value is only ever read to build the friendly "current
+// value" display, never required to already be a sound file.
+func TestPopulateNodeWXTonesOffersEveryCTKey(t *testing.T) {
+	s, _ := newWXToneTestServer(t, "unused")
+	node, err := s.store.LoadNode("2000")
+	if err != nil {
+		t.Fatal(err)
 	}
-	writeCustomSound(t, customDir, "ct1", "ct1-bytes")
+	data := nodeFormData{Node: node, SkywarnInstalled: true, CTKeys: []string{"ct1", "cmdmode"}}
+	s.populateNodeWXTones(&data)
 
-	store := config.NewStore(asteriskDir)
-	soundsStore := sounds.New(customDir, filepath.Join(t.TempDir(), "stock-does-not-exist"), "sox")
-	s := &Server{store: store, sounds: soundsStore, wxTones: wxtone.New(filepath.Join(t.TempDir(), "wx-tones.json"))}
+	if len(data.CTKeys) != 2 {
+		t.Fatalf("CTKeys = %v, want unchanged (populateNodeWXTones must not filter it)", data.CTKeys)
+	}
+}
+
+// TestApplyWXToneToneTypeRewritesRptConfAndReloads covers a pure
+// tone-type entry: applying WX must rewrite ct1's rpt.conf value to the
+// WX tone's raw "|t(...)" string and call AsteriskReloadRpt's plain
+// "rpt reload" form -- never touching any sound file at all.
+func TestApplyWXToneToneTypeRewritesRptConfAndReloads(t *testing.T) {
+	s, _ := newWXToneTestServer(t, "|t(660,0,150,2048)")
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	s.asteriskBin = fakeAsterisk(t, logPath)
+
+	entry := wxtone.Entry{
+		Node: "2000", CTKey: "ct1",
+		NormalType: wxtone.TypeTone, NormalTone: "|t(660,0,150,2048)",
+		WXType: wxtone.TypeTone, WXTone: "|t(650,0,100,2048)(770,0,100,2048)",
+	}
+	if err := s.applyWXTone(context.Background(), entry, wxtone.ModeWX); err != nil {
+		t.Fatalf("applyWXTone(WX) error = %v", err)
+	}
 
 	node, err := s.store.LoadNode("2000")
 	if err != nil {
 		t.Fatal(err)
 	}
-	data := nodeFormData{Node: node, SkywarnInstalled: true, CTKeys: []string{"ct1", "ct2"}}
-	s.populateNodeWXTones(&data)
+	entries, err := s.store.ListTelemetryEntries(node.Telemetry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	for _, te := range entries {
+		if te.Key == "ct1" {
+			got = te.Value
+		}
+	}
+	if got != "|t(650,0,100,2048)(770,0,100,2048)" {
+		t.Fatalf("ct1 = %q, want the WX tone value", got)
+	}
 
-	if len(data.SoundCTKeys) != 1 || data.SoundCTKeys[0] != "ct1" {
-		t.Fatalf("SoundCTKeys = %v, want only [ct1] (ct2 is a tone-generator value and must not be offered)", data.SoundCTKeys)
+	calls, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("expected AsteriskReloadRpt to have been called: %v", err)
+	}
+	if got := strings.TrimSpace(string(calls)); got != "rpt reload" {
+		t.Fatalf("calls = %q, want \"rpt reload\"", got)
+	}
+}
+
+// TestApplyWXToneMixedTypeSwitchesBetweenSoundAndTone covers an entry
+// where Normal is a sound file and WX is a tone -- the case that broke
+// the original resolveCTDestPath-based sound swap, since ct1's rpt.conf
+// value stops being a fixed sound-file reference once a tone apply has
+// run. Applying WX must write the tone's raw value; applying Normal
+// afterward must write the sound file's own rpt.conf-ready reference
+// (sounds.File.Ref), not attempt a byte-level file copy.
+func TestApplyWXToneMixedTypeSwitchesBetweenSoundAndTone(t *testing.T) {
+	s, customDir := newWXToneTestServer(t, "unused")
+	writeCustomSound(t, customDir, "normal-tone", "NORMAL")
+	ct1Ref := filepath.Join(customDir, "normal-tone")
+	rewriteFixtureCT1(t, s, ct1Ref) // arbitrary starting value, about to be overwritten either way
+	logPath := filepath.Join(t.TempDir(), "calls.log")
+	s.asteriskBin = fakeAsterisk(t, logPath)
+
+	entry := wxtone.Entry{
+		Node: "2000", CTKey: "ct1",
+		NormalType: wxtone.TypeSound, NormalSound: "normal-tone",
+		WXType: wxtone.TypeTone, WXTone: "|t(650,0,100,2048)",
+	}
+
+	if err := s.applyWXTone(context.Background(), entry, wxtone.ModeWX); err != nil {
+		t.Fatalf("applyWXTone(WX) error = %v", err)
+	}
+	node, err := s.store.LoadNode("2000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	value := func() string {
+		entries, err := s.store.ListTelemetryEntries(node.Telemetry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, te := range entries {
+			if te.Key == "ct1" {
+				return te.Value
+			}
+		}
+		return ""
+	}
+	if got := value(); got != "|t(650,0,100,2048)" {
+		t.Fatalf("after WX apply, ct1 = %q, want the tone value", got)
+	}
+
+	if err := s.applyWXTone(context.Background(), entry, wxtone.ModeNormal); err != nil {
+		t.Fatalf("applyWXTone(Normal) error = %v", err)
+	}
+	if got := value(); got != ct1Ref {
+		t.Fatalf("after Normal apply, ct1 = %q, want the sound file's own reference %q", got, ct1Ref)
+	}
+
+	calls, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("expected AsteriskReloadRpt to have been called: %v", err)
+	}
+	if got := strings.TrimSpace(string(calls)); got != "rpt reload\nrpt reload" {
+		t.Fatalf("calls = %q, want two reloads (one per apply)", got)
 	}
 }

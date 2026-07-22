@@ -7,10 +7,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/skywarnplus"
+	"hamvoipconfiggui/internal/system"
 	"hamvoipconfiggui/internal/wxtone"
 )
 
@@ -58,20 +60,16 @@ func (s *Server) checkWXTones(ctx context.Context) {
 	if err != nil || len(entries) == 0 {
 		return
 	}
-	status, err := skywarnplus.GetStatus(ctx, s.skywarnDir)
+	desired, err := s.desiredWXMode(ctx)
 	if err != nil {
 		log.Printf("wxtone: couldn't read SkywarnPlus status: %v", err)
 		return
-	}
-	desired := wxtone.ModeNormal
-	if status.ActiveAlertCount > 0 {
-		desired = wxtone.ModeWX
 	}
 	for _, e := range entries {
 		if e.Mode == desired {
 			continue
 		}
-		if err := s.applyWXTone(e, desired); err != nil {
+		if err := s.applyWXTone(ctx, e, desired); err != nil {
 			log.Printf("wxtone: node %s %s: %v", e.Node, e.CTKey, err)
 			continue
 		}
@@ -79,6 +77,23 @@ func (s *Server) checkWXTones(ctx context.Context) {
 			log.Printf("wxtone: node %s %s: recording new mode: %v", e.Node, e.CTKey, err)
 		}
 	}
+}
+
+// desiredWXMode reads SkywarnPlus's current status and reports which of
+// ModeNormal/ModeWX every configured entry should currently be in —
+// shared by the poller and by a newly-saved entry, so a mapping applies
+// right away rather than waiting for the next actual alert transition
+// (which, for the "normal" state in particular, might not happen again
+// for a long time).
+func (s *Server) desiredWXMode(ctx context.Context) (string, error) {
+	status, err := skywarnplus.GetStatus(ctx, s.skywarnDir)
+	if err != nil {
+		return "", err
+	}
+	if status.ActiveAlertCount > 0 {
+		return wxtone.ModeWX, nil
+	}
+	return wxtone.ModeNormal, nil
 }
 
 // resolveCTDestPath finds the real on-disk file e.CTKey's current
@@ -140,32 +155,90 @@ func (s *Server) resolveSoundSourcePath(name string) (string, error) {
 	return s.sounds.ResolveStockPath(name)
 }
 
-// applyWXTone copies whichever sound (e.NormalSound or e.WXSound,
-// depending on desired) onto e.CTKey's existing destination file —
-// never touching rpt.conf itself, so this takes effect immediately with
-// no Asterisk restart, the same technique SkywarnPlus's own SkyControl.py
-// uses for its courtesy-tone swap.
-func (s *Server) applyWXTone(e wxtone.Entry, desired string) error {
+// resolveSoundRef finds name's rpt.conf-ready reference (sounds.File.Ref
+// — a bare "rpt/..." name for a stock file, an absolute path for a
+// custom one), trying custom then stock like resolveSoundSourcePath.
+// Used only on the tone-involved apply path below, where a sound
+// state's value has to be written into rpt.conf itself rather than
+// copied onto an existing destination file's bytes — ctX may currently
+// hold the other state's raw tone value, so there's no fixed
+// destination file to discover the way resolveCTDestPath does.
+func (s *Server) resolveSoundRef(name string) (string, error) {
+	files, err := s.sounds.ListAll()
+	if err != nil {
+		return "", fmt.Errorf("list sounds: %w", err)
+	}
+	for _, f := range files {
+		if f.Name == name {
+			return f.Ref, nil
+		}
+	}
+	return "", fmt.Errorf("sound %q not found", name)
+}
+
+// applyWXTone brings e.CTKey to whichever of its Normal/WX states
+// desired selects. Two entirely different mechanisms (see internal/
+// wxtone's package doc for why):
+//   - both states are TypeSound: copy the sound file's bytes onto
+//     e.CTKey's existing destination file — never touching rpt.conf
+//     itself, so this takes effect immediately with no Asterisk
+//     involvement, the same technique SkywarnPlus's own SkyControl.py
+//     uses for its courtesy-tone swap.
+//   - either state is TypeTone: rewrite rpt.conf's ctX= value itself
+//     (a tone's raw "|t(...)" value, or a sound's rpt.conf-ready Ref),
+//     then a live app_rpt reload (system.AsteriskReloadRpt) — safe here
+//     (verified against app_rpt's own source), unlike a full Asterisk
+//     restart. Needed even for this pair's own sound state, since ctX
+//     may currently hold the other state's tone value rather than a
+//     fixed destination file's reference.
+func (s *Server) applyWXTone(ctx context.Context, e wxtone.Entry, desired string) error {
 	node, err := s.store.LoadNode(e.Node)
 	if err != nil {
 		return fmt.Errorf("load node: %w", err)
 	}
-	destPath, err := s.resolveCTDestPath(node, e.CTKey)
-	if err != nil {
-		return err
+
+	if e.NormalType == wxtone.TypeSound && e.WXType == wxtone.TypeSound {
+		destPath, err := s.resolveCTDestPath(node, e.CTKey)
+		if err != nil {
+			return err
+		}
+		sourceName := e.NormalSound
+		if desired == wxtone.ModeWX {
+			sourceName = e.WXSound
+		}
+		srcPath, err := s.resolveSoundSourcePath(sourceName)
+		if err != nil {
+			return fmt.Errorf("resolve %q: %w", sourceName, err)
+		}
+		if srcPath == destPath {
+			return nil // already identical on disk, nothing to copy
+		}
+		return copyFileContents(srcPath, destPath)
 	}
-	sourceName := e.NormalSound
+
+	stateType, sound, tone := e.NormalType, e.NormalSound, e.NormalTone
 	if desired == wxtone.ModeWX {
-		sourceName = e.WXSound
+		stateType, sound, tone = e.WXType, e.WXSound, e.WXTone
 	}
-	srcPath, err := s.resolveSoundSourcePath(sourceName)
-	if err != nil {
-		return fmt.Errorf("resolve %q: %w", sourceName, err)
+	value := tone
+	if stateType == wxtone.TypeSound {
+		ref, err := s.resolveSoundRef(sound)
+		if err != nil {
+			return fmt.Errorf("resolve %q: %w", sound, err)
+		}
+		value = ref
 	}
-	if srcPath == destPath {
-		return nil // already identical on disk, nothing to copy
+	section := node.Telemetry
+	if section == "" {
+		section = "telemetry"
 	}
-	return copyFileContents(srcPath, destPath)
+	if err := s.store.SetTelemetryEntry(section, e.CTKey, value); err != nil {
+		return fmt.Errorf("set %s: %w", e.CTKey, err)
+	}
+	if err := system.AsteriskReloadRpt(ctx, s.asteriskBin); err != nil {
+		return fmt.Errorf("reload app_rpt: %w", err)
+	}
+	return nil
 }
 
 // copyFileContents overwrites dest's content with src's, matching
@@ -205,24 +278,73 @@ func (s *Server) populateNodeWXTones(data *nodeFormData) {
 		return
 	}
 	data.WXTones = entries
+}
 
-	// Only offer a CTKey in the picker if it'll actually be accepted --
-	// reuses resolveCTDestPath itself (the exact same check
-	// handleNodeWXToneSave runs) rather than a second, separately
-	// maintained filter that could silently drift out of sync and offer
-	// a key (e.g. one still set to a tone-generator value) that's
-	// guaranteed to be rejected on submit.
-	for _, key := range data.CTKeys {
-		if _, err := s.resolveCTDestPath(data.Node, key); err == nil {
-			data.SoundCTKeys = append(data.SoundCTKeys, key)
+// parseWXToneState reads one of the Normal/WX state's submitted
+// fields — form field names prefixed with prefix — as either a tone
+// (four numbers, built into app_rpt's own "|t(f1,f2,dur,amp)" syntax
+// via config.ToneSpec.String()) or a sound file name, per the
+// prefix+"_type" radio's value.
+func parseWXToneState(r *http.Request, prefix string) (string, string, string, error) {
+	switch typ := r.FormValue(prefix + "_type"); typ {
+	case wxtone.TypeSound:
+		sound := r.FormValue(prefix + "_sound")
+		if sound == "" {
+			return "", "", "", fmt.Errorf("pick a sound file")
 		}
+		return wxtone.TypeSound, sound, "", nil
+	case wxtone.TypeTone:
+		spec, err := parseToneFields(r, prefix)
+		if err != nil {
+			return "", "", "", err
+		}
+		return wxtone.TypeTone, "", spec.String(), nil
+	default:
+		return "", "", "", fmt.Errorf("pick a type: tone or sound file")
 	}
 }
 
-// handleNodeWXToneSave adds or updates one alert-driven courtesy-tone
-// mapping, rejecting a CTKey that doesn't currently resolve to one of
-// this app's own custom sound files (see resolveCTDestPath) rather than
-// silently accepting a mapping that could never actually apply.
+// parseToneFields reads prefix's four Freq1/Freq2/Duration/Amplitude
+// number fields, the same friendly tone editor already used elsewhere
+// for a telemetryRow with Mode == "tone".
+func parseToneFields(r *http.Request, prefix string) (config.ToneSpec, error) {
+	f1, err1 := strconv.Atoi(r.FormValue(prefix + "_freq1"))
+	f2, err2 := strconv.Atoi(r.FormValue(prefix + "_freq2"))
+	dur, err3 := strconv.Atoi(r.FormValue(prefix + "_duration"))
+	amp, err4 := strconv.Atoi(r.FormValue(prefix + "_amplitude"))
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return config.ToneSpec{}, fmt.Errorf("tone fields must all be numbers")
+	}
+	return config.ToneSpec{Freq1: f1, Freq2: f2, DurationMS: dur, Amplitude: amp}, nil
+}
+
+// findWXToneEntry looks up the entry handleNodeWXToneSave just saved for
+// node/ctKey, so it can be applied immediately (see desiredWXMode) —
+// Store.Save doesn't hand back a freshly-generated ID, so this re-reads
+// the node's entries and matches on CTKey (unique per node in this UI's
+// own add flow) rather than changing that store's established Save
+// signature just for this one caller.
+func (s *Server) findWXToneEntry(node, ctKey string) (wxtone.Entry, bool) {
+	entries, err := s.wxTones.ListForNode(node)
+	if err != nil {
+		return wxtone.Entry{}, false
+	}
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].CTKey == ctKey {
+			return entries[i], true
+		}
+	}
+	return wxtone.Entry{}, false
+}
+
+// handleNodeWXToneSave adds one alert-driven courtesy-tone mapping.
+// Each of Normal/WX is independently either a tone or a sound file (see
+// parseWXToneState); only the pure-sound-file combination is checked
+// against resolveCTDestPath, since that's the only combination that
+// still relies on ctX already pointing at a fixed destination file (see
+// applyWXTone) — any other combination is free to pick any of this
+// node's existing courtesy-tone keys, since its value is going to be
+// overwritten either way.
 func (s *Server) handleNodeWXToneSave(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	node, err := s.store.LoadNode(number)
@@ -235,28 +357,57 @@ func (s *Server) handleNodeWXToneSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctKey := r.FormValue("wxtone_ctkey")
-	normalSound := r.FormValue("wxtone_normal")
-	wxSound := r.FormValue("wxtone_wx")
-	if ctKey == "" || normalSound == "" || wxSound == "" {
-		s.renderNodeEditPage(w, r, number, flash("error", "Pick a courtesy tone key and both a normal and WX sound"))
+	if ctKey == "" {
+		s.renderNodeEditPage(w, r, number, flash("error", "Pick a courtesy tone key"))
 		return
 	}
-	if _, err := s.resolveCTDestPath(node, ctKey); err != nil {
-		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
+	normalType, normalSound, normalTone, err := parseWXToneState(r, "wxtone_normal")
+	if err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "Normal: "+err.Error()))
 		return
 	}
-	if _, err := s.resolveSoundSourcePath(normalSound); err != nil {
-		s.renderNodeEditPage(w, r, number, flash("error", "Normal sound: "+err.Error()))
+	wxType, wxSound, wxTone, err := parseWXToneState(r, "wxtone_wx")
+	if err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "WX: "+err.Error()))
 		return
 	}
-	if _, err := s.resolveSoundSourcePath(wxSound); err != nil {
-		s.renderNodeEditPage(w, r, number, flash("error", "WX sound: "+err.Error()))
-		return
+	if normalType == wxtone.TypeSound {
+		if _, err := s.resolveSoundSourcePath(normalSound); err != nil {
+			s.renderNodeEditPage(w, r, number, flash("error", "Normal sound: "+err.Error()))
+			return
+		}
 	}
-	entry := wxtone.Entry{Node: number, CTKey: ctKey, NormalSound: normalSound, WXSound: wxSound}
+	if wxType == wxtone.TypeSound {
+		if _, err := s.resolveSoundSourcePath(wxSound); err != nil {
+			s.renderNodeEditPage(w, r, number, flash("error", "WX sound: "+err.Error()))
+			return
+		}
+	}
+	if normalType == wxtone.TypeSound && wxType == wxtone.TypeSound {
+		if _, err := s.resolveCTDestPath(node, ctKey); err != nil {
+			s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
+			return
+		}
+	}
+	entry := wxtone.Entry{
+		Node: number, CTKey: ctKey,
+		NormalType: normalType, NormalSound: normalSound, NormalTone: normalTone,
+		WXType: wxType, WXSound: wxSound, WXTone: wxTone,
+	}
 	if err := s.wxTones.Save(entry); err != nil {
 		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
 		return
+	}
+	if skywarnplus.IsInstalled(s.skywarnDir) {
+		if desired, derr := s.desiredWXMode(r.Context()); derr == nil {
+			if saved, ok := s.findWXToneEntry(number, ctKey); ok {
+				if err := s.applyWXTone(r.Context(), saved, desired); err != nil {
+					log.Printf("wxtone: node %s %s: applying immediately: %v", number, ctKey, err)
+				} else if err := s.wxTones.SetMode(saved.ID, desired); err != nil {
+					log.Printf("wxtone: node %s %s: recording new mode: %v", number, ctKey, err)
+				}
+			}
+		}
 	}
 	http.Redirect(w, r, "/nodes/"+number, http.StatusSeeOther)
 }
