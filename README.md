@@ -4,6 +4,18 @@ A browser-based configuration tool for a [HamVoIP](http://hamvoip.org/) AllStarL
 
 Runs as a single self-contained binary directly on the Pi. No Python/Node runtime to install, no database, no build step for the frontend.
 
+## Get Started
+
+On the Pi (as root, or with `sudo`):
+
+```sh
+git clone https://github.com/na4wx/na4wx_allstar_dashboard.git
+cd na4wx_allstar_dashboard
+sudo ./install.sh
+```
+
+`install.sh` needs to run as root — it installs system packages, writes to `/etc/hamvoip-gui/`, and installs a systemd unit. It checks for and installs everything else it needs (a modern Go toolchain, Piper/espeak-ng for text-to-speech, and optionally SkywarnPlus), builds the app natively on the Pi, and starts it listening on port 8088. Re-running the same command later pulls and installs updates. See [Deploying to a HamVoIP node](#deploying-to-a-hamvoip-node) below for the cross-compile alternative and first-run details.
+
 ## Features
 
 The UI is five pages: **Home**, **Nodes**, **Status**, **System**, and **Raw Config**. On a narrow screen the nav collapses behind a hamburger button; every page's own layout is responsive independent of that.
@@ -25,9 +37,18 @@ Detailed per-node stats (every field `rpt stats` reports) and connection history
 ### Adding and configuring a node
 
 - **Setup wizard** (`/nodes/new`) asks only for node number, callsign, AllStarLink password, repeater mode, and radio interface, then derives and writes everything else across `rpt.conf`, `extensions.conf`, `iax.conf`, and the radio driver file
-- **Node page** — tabbed into Setup / Tones & Audio / Network / Live & Commands: identity, radio hardware (pick an existing device or create one inline), timing, command/tone set, a friendly courtesy-tone and sound-file editor (with upload — a WAV is transcoded via `sox` to the format app_rpt expects), AllStarLink registration, live link status, DTMF relay (`asterisk -rx "rpt fun <node> <digits>"`), and saved macros
+- **Node page** — tabbed into **Setup**, **Tones & Audio**, **Allstar Network**, **Live & Commands**, and **Automation**:
+  - *Setup*: identity, radio hardware (pick an existing device or create one inline), timing (squelch tail, transmit safety cutoff, station ID interval — shown and edited in minutes, stored as the milliseconds app_rpt expects), and command/tone set
+  - *Tones & Audio*: a friendly courtesy-tone and telemetry-sound editor; custom sound files with upload (a WAV is transcoded via `sox` to the format app_rpt expects), in-browser playback, and delete; and a **"Create from text"** generator that turns typed text into a sound file using [Piper](https://github.com/rhasspy/piper) (offline neural TTS, the default) with an automatic fallback to `espeak-ng`/`espeak` on hardware Piper doesn't support (e.g. 32-bit ARMv6 — Pi Zero/1) — both with an in-browser preview before saving
+  - *Allstar Network*: AllStarLink registration and advanced IAX2 connection settings
+  - *Live & Commands*: who's connected right now, connect/disconnect a node, DTMF relay (`asterisk -rx "rpt fun <node> <digits>"`), saved macros, and a command-set reference
+  - *Automation*: scheduled connect/disconnect (cron-style, written straight into `rpt.conf`'s own scheduler), scheduled sound playback (tracked and fired by this app itself, since app_rpt has no native equivalent), and, if [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) is installed (see below), its weather-alert settings — feature toggles, county codes, and node registration
 - **Command/tone set** — each node gets its own `functions<number>` / `macro<number>` / `telemetry<number>` / `morse<number>` sections, either copied from an existing node or bootstrapped from known-good defaults. This matters: a node whose `functions=` field is blank falls back to a bare `[functions]` section that doesn't exist on a stock HamVoIP install, so it silently accepts no DTMF commands at all
 - **Dialplan entries** — `extensions.conf`'s `radio-secure`, `radio-secure-proxy`, and `radio-iaxrpt` contexts are written on create and removed on delete, with a bulk backfill button on Home for nodes that predate this app
+
+### Weather alerts via SkywarnPlus
+
+The Automation tab can configure [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) by [Mason10198](https://github.com/Mason10198) — a third-party tool that announces National Weather Service alerts over the repeater — if you choose to install it via `install.sh`'s interactive prompt (see [Deploying](#deploying-to-a-hamvoip-node) below; it's opt-in, not installed by default). This app never bundles or redistributes SkywarnPlus itself: `install.sh` downloads the real upstream release, and this app's UI only edits its `config.yaml` afterward (feature toggles via SkywarnPlus's own `SkyControl.py`, county codes and node registration via a small companion script, [`deploy/sky_configure.py`](deploy/sky_configure.py), that uses the same `ruamel.yaml` dependency SkywarnPlus already requires). Advanced features (AlertScript, Pushover, SkyDescribe, courtesy-tone/ID swap during alerts) aren't covered by this UI — see SkywarnPlus's own README and edit its `config.yaml` directly for those.
 
 ### System
 
@@ -41,7 +62,7 @@ Deliberately **not** covered by a dedicated form (edit via Raw Config instead): 
 
 ## Why this stack
 
-Go compiles to a single static binary with everything embedded (templates, CSS, JS) — copy one file to the Pi, no dependency management on-device. The frontend is hand-written HTML/CSS/vanilla JS, no build pipeline, no CDN dependencies. The UI works fully offline, which matters on a device whose whole job is sometimes *providing* connectivity; the only thing that reaches the internet is the optional node-directory download that puts callsigns next to node numbers, and everything works without it.
+Go compiles to a single static binary with everything embedded (templates, CSS, JS) — copy one file to the Pi, no dependency management on-device. The frontend is hand-written HTML/CSS/vanilla JS, no build pipeline, no CDN dependencies. The UI works fully offline, which matters on a device whose whole job is sometimes *providing* connectivity; the only thing this app's own process reaches the internet for is the optional node-directory download that puts callsigns next to node numbers, and everything works without it. (If you opt into installing SkywarnPlus, that's a separate process this app only configures — it makes its own periodic calls to the National Weather Service to do its job.)
 
 Config files are read and written through [`internal/asteriskconf`](internal/asteriskconf/asteriskconf.go), a parser that preserves comments, blank lines, and key order — HamVoIP's shipped configs are heavily hand-annotated, and a generic INI library would silently discard all of that on save.
 
@@ -60,11 +81,11 @@ make pi64       # cross-compile for Pi 3/4 running 64-bit OS
 
 ### Recommended: build on the Pi
 
-Clone the repo on the node and run the top-level `install.sh`. It checks for the tools it needs (installing Go from go.dev if pacman's is too old — Arch Linux ARM's has been observed at go1.6, far below the 1.22 this needs), pulls any new commits, builds natively, and deploys:
+Clone the repo on the node and run the top-level `install.sh`. It checks for the tools it needs (installing Go from go.dev if pacman's is too old — Arch Linux ARM's has been observed at go1.6, far below the 1.22 this needs; `sox`; and Piper or, where Piper has no build for the board's architecture, an `espeak-ng`/`espeak` fallback, for the "Create from text" sound generator), asks whether to also install SkywarnPlus (opt-in — see [Weather alerts via SkywarnPlus](#weather-alerts-via-skywarnplus) above), pulls any new commits, builds natively, and deploys:
 
 ```sh
-git clone https://github.com/na4wx/na4wx_allstar_ui.git
-cd na4wx_allstar_ui
+git clone https://github.com/na4wx/na4wx_allstar_dashboard.git
+cd na4wx_allstar_dashboard
 sudo ./install.sh
 ```
 
@@ -111,11 +132,26 @@ Visit `http://<pi-ip>:8088/setup` to create the admin account — there is no de
                    (default "https://allmondb.allstarlink.org/allmondb.php")
 -node-db-refresh   download the node directory daily; set false to only read an existing
                    on-disk copy and never make outbound requests (default true)
+-sounds-custom-dir directory for the operator's own uploadable sound files, e.g. a station-ID
+                   recording (default "/etc/asterisk/local")
+-sounds-stock-dir  app_rpt's own built-in prompt library, offered read-only as pick-list
+                   options (default "/var/lib/asterisk/sounds/rpt")
+-sox-tool          path to the sox audio tool, or bare name if it's on PATH — transcodes an
+                   uploaded or generated sound file to the format app_rpt expects (default "sox")
+-sound-schedule-file
+                   where the Automation tab's scheduled sound-playback entries are stored
+                   (default "/etc/hamvoip-gui/sound-schedule.json")
+-tts-tool          path to the Piper text-to-speech binary, or bare name if it's on PATH, used
+                   by "Create from text" (default "piper")
+-tts-voices-dir    directory holding downloaded Piper voice models (.onnx files); install.sh
+                   downloads one by default (default "/etc/hamvoip-gui/piper-voices")
+-skywarn-dir       directory holding an operator-installed copy of SkywarnPlus, if any — see
+                   Weather alerts via SkywarnPlus (default "/usr/local/bin/SkywarnPlus")
 ```
 
 All Asterisk control (the running/stopped indicator, the System page's restart button, and each node's live status and DTMF relay) goes through Asterisk's own CLI (`<bin> -rx "..."`) rather than `systemctl` — Asterisk is frequently supervised some other way (e.g. HamVoIP runs it under a `safe_asterisk` watchdog script, not a native systemd unit), so asking Asterisk itself is the only check that works regardless of how it's actually being run.
 
-The node directory is the only feature that reaches the internet. It's cosmetic — it turns `49616` into `49616 WB4GBI` — and everything works without it. `/var/lib/asterisk/astdb.txt` is the same path AllStarLink's own `asl3-update-astdb` uses, so other dashboards on the box share one copy. HamVoIP also refreshes this file from its own cron job; both write the same data from the same source, and writes are atomic, so the overlap is harmless. Use `-node-db-refresh=false` if you'd rather this app never made outbound requests.
+The node directory is the only feature that reaches the internet from this app's own process. It's cosmetic — it turns `49616` into `49616 WB4GBI` — and everything works without it. `/var/lib/asterisk/astdb.txt` is the same path AllStarLink's own `asl3-update-astdb` uses, so other dashboards on the box share one copy. HamVoIP also refreshes this file from its own cron job; both write the same data from the same source, and writes are atomic, so the overlap is harmless. Use `-node-db-refresh=false` if you'd rather this app never made outbound requests.
 
 `-asterisk-bin` and `-asterisk-log` matter because HamVoIP installs Asterisk at a non-standard prefix (`/usr/local/hamvoip-asterisk/`) rather than `/usr/sbin` and `/var/log`. Find the real binary path with:
 
@@ -142,6 +178,16 @@ gofmt -l .
 The `internal/asteriskconf` and `internal/config` packages have the heaviest test coverage since they're the code responsible for not corrupting your node's configuration — round-trip parsing, comment preservation, duplicate-key handling (`exten =>`, `register =>`), and section create/update/delete are all covered.
 
 The parsers for app_rpt's CLI output (`rpt nodes`, `rpt lstats`, `rpt stats`) and for the AllStarLink node directory are tested against output captured verbatim from a real node rather than invented samples. That's deliberate: assuming a real-world format matched what looked reasonable has been this project's most repeated source of bugs.
+
+## Acknowledgments
+
+This app configures and shells out to several third-party tools rather than reimplementing what they already do well:
+
+- [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) by [Mason10198](https://github.com/Mason10198) (GPL-3.0) — the optional weather-alert automation on the Automation tab; see [Weather alerts via SkywarnPlus](#weather-alerts-via-skywarnplus)
+- [Piper](https://github.com/rhasspy/piper) — offline neural text-to-speech, the default engine behind "Create from text"
+- [espeak-ng](https://github.com/espeak-ng/espeak-ng) — the text-to-speech fallback on hardware Piper doesn't support
+- [sox](https://sox.sourceforge.net/) — audio transcoding for uploaded and generated sound files
+- [AllStarLink](https://www.allstarlink.org/) / [app_rpt](https://github.com/AllStarLink/app_rpt) and [HamVoIP](http://hamvoip.org/) — the platform this app configures
 
 ## License
 
