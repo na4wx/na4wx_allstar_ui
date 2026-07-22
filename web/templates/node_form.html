@@ -43,7 +43,8 @@
   <button type="button" data-tab-target="tones">Tones &amp; Audio</button>
   <button type="button" data-tab-target="network">Allstar Network</button>
   <button type="button" data-tab-target="live">Live &amp; Commands</button>
-  <button type="button" data-tab-target="automation">Automation</button>
+  <button type="button" data-tab-target="automation">Scheduler</button>
+  <button type="button" data-tab-target="skywarnplus">SkywarnPlus</button>
 </div>
 
 <div data-tab-panel="setup">
@@ -251,7 +252,7 @@
       </div>
       <input type="text" id="idrecording" name="idrecording" value="{{.Node.IDRecording}}" list="sound_files" placeholder="|iyourcallsign or a sound file name">
       {{if and .SkywarnInstalled .SkywarnStatus.IDSwapEnabled}}
-      <p class="hint">SkywarnPlus's own ID swap is enabled — the file this points at may change automatically during an alert. See the Automation tab.</p>
+      <p class="hint">SkywarnPlus's own ID swap is enabled — the file this points at may change automatically during an alert. See the SkywarnPlus tab.</p>
       {{end}}
     </div>
   </div>
@@ -308,7 +309,7 @@
       {{template "help" "Courtesy tones, status beeps, and sound-file playback for this node. Each entry either plays a tone (frequency/duration/amplitude) or a named sound file — app_rpt accepts either in any of these fields, so this shows whichever this entry currently is."}}
     </div>
     {{if and .SkywarnInstalled .SkywarnStatus.CourtesyToneSwapEnabled}}
-    <p class="hint">SkywarnPlus's own courtesy-tone swap is enabled — one of these files may change automatically during an alert. See the Automation tab.</p>
+    <p class="hint">SkywarnPlus's own courtesy-tone swap is enabled — one of these files may change automatically during an alert. See the SkywarnPlus tab.</p>
     {{end}}
     {{if .TelemetryRows}}
     <table>
@@ -894,7 +895,8 @@
     </div>
   </form>
 </div>
-
+</div>
+<div data-tab-panel="skywarnplus">
 <div class="card">
   <div class="label-row">
     <h2 style="margin:0">Weather Alerts (SkywarnPlus)</h2>

@@ -69,7 +69,7 @@ type Server struct {
 	// skywarnDir is where an operator-installed copy of SkywarnPlus
 	// lives (installed by install.sh, not by this app at runtime — see
 	// internal/skywarnplus's package doc). The "Weather Alerts" card on
-	// the Automation tab just checks whether something's there.
+	// its own SkywarnPlus tab just checks whether something's there.
 	skywarnDir string
 
 	// wxTones holds the operator's own alert-driven courtesy-tone

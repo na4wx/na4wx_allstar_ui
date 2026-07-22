@@ -37,20 +37,21 @@ Detailed per-node stats (every field `rpt stats` reports) and connection history
 ### Adding and configuring a node
 
 - **Setup wizard** (`/nodes/new`) asks only for node number, callsign, AllStarLink password, repeater mode, and radio interface, then derives and writes everything else across `rpt.conf`, `extensions.conf`, `iax.conf`, and the radio driver file
-- **Node page** — tabbed into **Setup**, **Tones & Audio**, **Allstar Network**, **Live & Commands**, and **Automation**:
+- **Node page** — tabbed into **Setup**, **Tones & Audio**, **Allstar Network**, **Live & Commands**, **Scheduler**, and **SkywarnPlus**:
   - *Setup*: identity, radio hardware (pick an existing device or create one inline), timing (squelch tail, transmit safety cutoff, station ID interval — shown and edited in minutes, stored as the milliseconds app_rpt expects), and command/tone set
   - *Tones & Audio*: a friendly courtesy-tone and telemetry-sound editor; custom sound files with upload (a WAV is transcoded via `sox` to the format app_rpt expects), in-browser playback, and delete; and a **"Create from text"** generator that turns typed text into a sound file using [Piper](https://github.com/rhasspy/piper) (offline neural TTS, the default) with an automatic fallback to `espeak-ng`/`espeak` on hardware Piper doesn't support (e.g. 32-bit ARMv6 — Pi Zero/1) — both with an in-browser preview before saving
   - *Allstar Network*: AllStarLink registration and advanced IAX2 connection settings
   - *Live & Commands*: who's connected right now, connect/disconnect a node, DTMF relay (`asterisk -rx "rpt fun <node> <digits>"`), saved macros, and a command-set reference
-  - *Automation*: scheduled connect/disconnect (cron-style, written straight into `rpt.conf`'s own scheduler), scheduled sound playback (tracked and fired by this app itself, since app_rpt has no native equivalent), and, if [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) is installed (see below), its weather-alert settings — feature toggles, county codes, node registration, Pushover notifications, SkyDescribe, and this app's own alert-driven WX courtesy tone
+  - *Scheduler*: scheduled connect/disconnect (cron-style, written straight into `rpt.conf`'s own scheduler) and scheduled sound playback (tracked and fired by this app itself, since app_rpt has no native equivalent)
+  - *SkywarnPlus*: if [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) is installed (see below), its weather-alert settings — feature toggles, county codes, node registration, Pushover notifications, SkyDescribe, and this app's own alert-driven WX courtesy tone
 - **Command/tone set** — each node gets its own `functions<number>` / `macro<number>` / `telemetry<number>` / `morse<number>` sections, either copied from an existing node or bootstrapped from known-good defaults. This matters: a node whose `functions=` field is blank falls back to a bare `[functions]` section that doesn't exist on a stock HamVoIP install, so it silently accepts no DTMF commands at all
 - **Dialplan entries** — `extensions.conf`'s `radio-secure`, `radio-secure-proxy`, and `radio-iaxrpt` contexts are written on create and removed on delete, with a bulk backfill button on Home for nodes that predate this app
 
 ### Weather alerts via SkywarnPlus
 
-The Automation tab can configure [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) by [Mason10198](https://github.com/Mason10198) — a third-party tool that announces National Weather Service alerts over the repeater — if you choose to install it via `install.sh`'s interactive prompt (see [Deploying](#deploying-to-a-hamvoip-node) below; it's opt-in, not installed by default). This app never bundles or redistributes SkywarnPlus itself: `install.sh` downloads the real upstream release, and this app's UI only edits its `config.yaml` afterward (feature toggles, including AlertScript's own on/off switch, via SkywarnPlus's own `SkyControl.py`; county codes, node registration, Pushover push-notification settings, and SkyDescribe's text-to-speech settings via a small companion script, [`deploy/sky_configure.py`](deploy/sky_configure.py), that uses the same `ruamel.yaml` dependency SkywarnPlus already requires). AlertScript's own command/DTMF mappings and SkywarnPlus's own courtesy-tone/ID swap aren't covered by this UI — see SkywarnPlus's own README and edit its `config.yaml` directly for those. (If SkywarnPlus's own swap is enabled, the Tones & Audio and Setup tabs show a read-only warning next to whatever file it might change.)
+The SkywarnPlus tab can configure [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) by [Mason10198](https://github.com/Mason10198) — a third-party tool that announces National Weather Service alerts over the repeater — if you choose to install it via `install.sh`'s interactive prompt (see [Deploying](#deploying-to-a-hamvoip-node) below; it's opt-in, not installed by default). This app never bundles or redistributes SkywarnPlus itself: `install.sh` downloads the real upstream release, and this app's UI only edits its `config.yaml` afterward (feature toggles, including AlertScript's own on/off switch, via SkywarnPlus's own `SkyControl.py`; county codes, node registration, Pushover push-notification settings, and SkyDescribe's text-to-speech settings via a small companion script, [`deploy/sky_configure.py`](deploy/sky_configure.py), that uses the same `ruamel.yaml` dependency SkywarnPlus already requires). AlertScript's own command/DTMF mappings and SkywarnPlus's own courtesy-tone/ID swap aren't covered by this UI — see SkywarnPlus's own README and edit its `config.yaml` directly for those. (If SkywarnPlus's own swap is enabled, the Tones & Audio and Setup tabs show a read-only warning next to whatever file it might change.)
 
-Instead of SkywarnPlus's own courtesy-tone swap, this app offers its own safer alternative: a "WX courtesy tone" mapping on the Automation tab that reads SkywarnPlus's already-fetched active-alert count and swaps a courtesy tone's underlying sound file itself — the same technique SkywarnPlus's own `SkyControl.py` uses (only the file's bytes change, never `rpt.conf` itself, so it takes effect immediately with no Asterisk restart), but fully tracked and visible in this app rather than an uncoordinated second process. Only works for a courtesy tone already set to a custom sound file (not a tone-generator string) on the Tones & Audio tab.
+Instead of SkywarnPlus's own courtesy-tone swap, this app offers its own safer alternative: a "WX courtesy tone" mapping on the SkywarnPlus tab that reads SkywarnPlus's already-fetched active-alert count and swaps a courtesy tone's underlying sound file itself — the same technique SkywarnPlus's own `SkyControl.py` uses (only the file's bytes change, never `rpt.conf` itself, so it takes effect immediately with no Asterisk restart), but fully tracked and visible in this app rather than an uncoordinated second process. Only works for a courtesy tone already set to a custom sound file (not a tone-generator string) on the Tones & Audio tab.
 
 ### System
 
@@ -141,7 +142,7 @@ Visit `http://<pi-ip>:8088/setup` to create the admin account — there is no de
 -sox-tool          path to the sox audio tool, or bare name if it's on PATH — transcodes an
                    uploaded or generated sound file to the format app_rpt expects (default "sox")
 -sound-schedule-file
-                   where the Automation tab's scheduled sound-playback entries are stored
+                   where the Scheduler tab's scheduled sound-playback entries are stored
                    (default "/etc/hamvoip-gui/sound-schedule.json")
 -tts-tool          path to the Piper text-to-speech binary, or bare name if it's on PATH, used
                    by "Create from text" (default "piper")
@@ -149,7 +150,7 @@ Visit `http://<pi-ip>:8088/setup` to create the admin account — there is no de
                    downloads one by default (default "/etc/hamvoip-gui/piper-voices")
 -skywarn-dir       directory holding an operator-installed copy of SkywarnPlus, if any — see
                    Weather alerts via SkywarnPlus (default "/usr/local/bin/SkywarnPlus")
--wx-tones-file     where the Automation tab's alert-driven WX courtesy-tone mappings are
+-wx-tones-file     where the SkywarnPlus tab's alert-driven WX courtesy-tone mappings are
                    stored (default "/etc/hamvoip-gui/wx-tones.json")
 ```
 
@@ -187,7 +188,7 @@ The parsers for app_rpt's CLI output (`rpt nodes`, `rpt lstats`, `rpt stats`) an
 
 This app configures and shells out to several third-party tools rather than reimplementing what they already do well:
 
-- [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) by [Mason10198](https://github.com/Mason10198) (GPL-3.0) — the optional weather-alert automation on the Automation tab; see [Weather alerts via SkywarnPlus](#weather-alerts-via-skywarnplus)
+- [SkywarnPlus](https://github.com/Mason10198/SkywarnPlus) by [Mason10198](https://github.com/Mason10198) (GPL-3.0) — the optional weather-alert automation on its own SkywarnPlus tab; see [Weather alerts via SkywarnPlus](#weather-alerts-via-skywarnplus)
 - [Piper](https://github.com/rhasspy/piper) — offline neural text-to-speech, the default engine behind "Create from text"
 - [espeak-ng](https://github.com/espeak-ng/espeak-ng) — the text-to-speech fallback on hardware Piper doesn't support
 - [sox](https://sox.sourceforge.net/) — audio transcoding for uploaded and generated sound files
