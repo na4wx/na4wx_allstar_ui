@@ -173,10 +173,10 @@
       </div>
       <div class="field">
         <div class="label-row">
-          <label for="idtime">ID announcement interval (ms)</label>
-          {{template "help" "How often the repeater announces your callsign, as required by FCC rules. 300000 = 5 minutes. Must not exceed 600000 (10 minutes)."}}
+          <label for="idtime_minutes">ID announcement interval (minutes)</label>
+          {{template "help" "How often the repeater announces your callsign, as required by FCC rules. Default is 5 minutes. Must not exceed 10 minutes."}}
         </div>
-        <input type="number" id="idtime" name="idtime" value="{{.Node.IDTime}}" placeholder="300000">
+        <input type="number" step="any" id="idtime_minutes" name="idtime_minutes" value="{{.IDTimeMinutes}}" placeholder="5">
       </div>
     </div>
   </div>

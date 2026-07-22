@@ -1,7 +1,9 @@
 package server
 
 import (
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"hamvoipconfiggui/internal/config"
@@ -70,6 +72,13 @@ func defaultNodePeer(number, secret string) *config.Peer {
 type nodeFormData struct {
 	pageData
 	Node *config.Node
+
+	// IDTimeMinutes is Node.IDTime (rpt.conf's raw millisecond idtime
+	// value) converted to minutes for the Setup tab, since that's how
+	// operators actually think about ID interval ("every 5 minutes") —
+	// see idTimeToMinutes/minutesToIDTime. rpt.conf itself keeps storing
+	// milliseconds untouched, same as every other *time field on this page.
+	IDTimeMinutes string
 
 	Registration *config.Registration
 	Peer         *config.Peer
@@ -204,6 +213,7 @@ func (s *Server) newNodeFormData(n *config.Node) nodeFormData {
 	cards, _ := system.ListSoundCards()
 	return nodeFormData{
 		Node:          n,
+		IDTimeMinutes: idTimeToMinutes(n.IDTime),
 		RadioMode:     "existing",
 		RadioDevices:  s.loadRadioChannelOptions(),
 		Device:        &config.RadioDevice{},
@@ -269,13 +279,52 @@ func nodeFromForm(r *http.Request, number string) *config.Node {
 		HangTime:    r.FormValue("hangtime"),
 		AltHangTime: r.FormValue("althangtime"),
 		TOTime:      r.FormValue("totime"),
-		IDTime:      r.FormValue("idtime"),
+		IDTime:      minutesToIDTime(r.FormValue("idtime_minutes")),
 		IDRecording: r.FormValue("idrecording"),
 	}
 	if number == "" {
 		n.Number = r.FormValue("number")
 	}
 	return n
+}
+
+// idTimeToMinutes converts rpt.conf's raw idtime (milliseconds) to
+// minutes for display, rounded to 2 decimal places with trailing zeros
+// trimmed (so a clean "300000" reads as "5", not "5.00"). An empty or
+// unparseable value (e.g. a node that's never set idtime) becomes "",
+// not "0" — leaving the Setup field blank rather than implying a real
+// zero-minute interval.
+func idTimeToMinutes(ms string) string {
+	ms = strings.TrimSpace(ms)
+	if ms == "" {
+		return ""
+	}
+	v, err := strconv.ParseFloat(ms, 64)
+	if err != nil {
+		return ""
+	}
+	s := strconv.FormatFloat(v/60000, 'f', 2, 64)
+	s = strings.TrimRight(s, "0")
+	return strings.TrimRight(s, ".")
+}
+
+// minutesToIDTime converts a submitted minutes value back to the
+// integer-millisecond string idtime actually stores in rpt.conf. Empty
+// input becomes empty output, matching every other *time field on this
+// page (no server-side validation — Asterisk's own behavior is the
+// source of truth). Unparseable input is passed through unchanged
+// rather than discarded, since that can only happen via a raw POST
+// bypassing the form's own number input.
+func minutesToIDTime(minutes string) string {
+	minutes = strings.TrimSpace(minutes)
+	if minutes == "" {
+		return ""
+	}
+	v, err := strconv.ParseFloat(minutes, 64)
+	if err != nil {
+		return minutes
+	}
+	return strconv.FormatFloat(math.Round(v*60000), 'f', 0, 64)
 }
 
 // extensionsSyncFailedMsg formats the flash shown when a node's rpt.conf
