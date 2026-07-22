@@ -59,6 +59,28 @@ func AsteriskRestart(ctx context.Context, bin string) error {
 	return err
 }
 
+// RptLocalPlay plays a sound file over node's own local RF output only —
+// confirmed by a real operator's report that it plays out the repeater's
+// own transmitter, but it never reaches any node currently linked to this
+// one. Used for "local only" scheduled sound playback (see
+// internal/soundschedule).
+func RptLocalPlay(ctx context.Context, bin, node, file string) error {
+	_, err := AsteriskRX(ctx, bin, "rpt localplay "+node+" "+file)
+	return err
+}
+
+// RptPlayback plays a sound file over node's local RF output AND sends
+// it to any node currently linked to this one — app_rpt's own sibling
+// command to RptLocalPlay. On a duplex=0 node (the setting used for
+// simplex/link-adapter builds) this is documented to fall back to the
+// exact same local-only behavior RptLocalPlay always has, so it's never
+// worse than RptLocalPlay, just sometimes not better. Used for "local +
+// linked nodes" scheduled sound playback.
+func RptPlayback(ctx context.Context, bin, node, file string) error {
+	_, err := AsteriskRX(ctx, bin, "rpt playback "+node+" "+file)
+	return err
+}
+
 // ServiceRestart restarts a systemd unit. Not used for Asterisk itself
 // (see AsteriskRestart) — kept for any other systemd-managed service
 // this tool might need to restart in the future.

@@ -231,6 +231,9 @@ remotemon=|t(1209,0,50,2048)
 speed=20
 frequency=800
 
+[schedule68536]
+1=00 20 * * 2
+
 [nodes]
 
 [68536]
@@ -240,6 +243,7 @@ functions = functions68536
 macro = macro68536
 telemetry = telemetry68536
 morse = morse68536
+scheduler = schedule68536
 
 [52829]
 rxchannel = SimpleUSB/Device
@@ -266,7 +270,8 @@ func TestCloneNodeConfigGivesDestinationAWorkingSet(t *testing.T) {
 		t.Fatalf("LoadNode(52829): %v", err)
 	}
 	if dst.Functions != "functions52829" || dst.Macro != "macro52829" ||
-		dst.Telemetry != "telemetry52829" || dst.Morse != "morse52829" {
+		dst.Telemetry != "telemetry52829" || dst.Morse != "morse52829" ||
+		dst.Scheduler != "schedule52829" {
 		t.Fatalf("52829 companion fields = %+v, want all *52829", dst)
 	}
 
@@ -277,6 +282,7 @@ func TestCloneNodeConfigGivesDestinationAWorkingSet(t *testing.T) {
 		"[macro52829]\n1 = *81 *80#",
 		"[telemetry52829]\nct1 = |t(350,0,100,2048)\nremotemon = |t(1209,0,50,2048)",
 		"[morse52829]\nspeed = 20\nfrequency = 800",
+		"[schedule52829]\n1 = 00 20 * * 2",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in output, got:\n%s", want, out)

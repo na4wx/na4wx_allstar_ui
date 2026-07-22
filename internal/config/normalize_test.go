@@ -47,11 +47,12 @@ func TestNormalizeRepointsAndCopies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NormalizeNodeConfig: %v", err)
 	}
-	// functions, telemetry and morse all pointed at *1998 sections;
-	// macro was blank (bare "macro" fallback). All four differ from the
-	// desired <prefix>52829 name, so all four are repaired.
-	if len(changed) != 4 {
-		t.Fatalf("changed = %v, want all four fields", changed)
+	// functions, telemetry and morse all pointed at *1998 sections; macro
+	// and scheduler were both blank (bare "macro"/"schedule" fallback).
+	// All five differ from the desired <prefix>52829 name, so all five
+	// are repaired.
+	if len(changed) != 5 {
+		t.Fatalf("changed = %v, want all five fields", changed)
 	}
 
 	node, err := s.LoadNode("52829")
@@ -70,6 +71,9 @@ func TestNormalizeRepointsAndCopies(t *testing.T) {
 	if node.Macro != "macro52829" {
 		t.Errorf("macro = %q, want macro52829", node.Macro)
 	}
+	if node.Scheduler != "schedule52829" {
+		t.Errorf("scheduler = %q, want schedule52829", node.Scheduler)
+	}
 
 	raw, err := os.ReadFile(filepath.Join(s.dir, RptConfFile))
 	if err != nil {
@@ -86,9 +90,12 @@ func TestNormalizeRepointsAndCopies(t *testing.T) {
 		t.Error("command entries were not copied into the new section")
 	}
 	// A blank field's bare fallback yields an empty but correctly-named
-	// section (there was no [macro] to copy from).
+	// section (there was no [macro] or [schedule] to copy from).
 	if !strings.Contains(got, "[macro52829]") {
 		t.Error("macro52829 section was not created for the blank field")
+	}
+	if !strings.Contains(got, "[schedule52829]") {
+		t.Error("schedule52829 section was not created for the blank field")
 	}
 	// The old sections are deliberately left in place.
 	if !strings.Contains(got, "[functions1998]") {

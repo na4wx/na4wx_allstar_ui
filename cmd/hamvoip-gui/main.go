@@ -34,6 +34,7 @@ func main() {
 	soundsCustomDir := flag.String("sounds-custom-dir", "/etc/asterisk/local", "directory for the operator's own uploadable sound files (station ID, custom courtesy tones) — confirmed on real HamVoIP hardware to already hold the node's station-ID recording")
 	soundsStockDir := flag.String("sounds-stock-dir", "/var/lib/asterisk/sounds/rpt", "app_rpt's own built-in prompt library, offered as read-only pick-list options (e.g. \"rpt/callproceeding\") — never written to")
 	soxTool := flag.String("sox-tool", "sox", "path to the sox audio tool, or bare name if it's on PATH (used to transcode an uploaded sound file to the 8kHz mono format app_rpt expects)")
+	soundSchedulePath := flag.String("sound-schedule-file", "/etc/hamvoip-gui/sound-schedule.json", "path to store the \"Automation\" tab's scheduled sound-playback entries — these aren't an Asterisk-native mechanism (unlike scheduled connect/disconnect, which lives in rpt.conf itself), so this app tracks them here and fires them itself")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -58,7 +59,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
@@ -69,6 +70,13 @@ func main() {
 	// server.New so constructing a Server (in tests) doesn't shell out
 	// to the asterisk binary.
 	srv.StartLinkHistoryPoller(context.Background())
+
+	// Fire scheduled sound-playback entries — the GUI-side half of the
+	// "Automation" tab (scheduled connect/disconnect needs nothing here;
+	// it's driven entirely by app_rpt's own native scheduler). Same
+	// reasoning as StartLinkHistoryPoller for starting it here rather than
+	// in server.New.
+	srv.StartSoundSchedulePoller(context.Background())
 
 	// Node directory: read whatever copy is on disk, and (unless
 	// disabled) keep it current. A download failure is logged and

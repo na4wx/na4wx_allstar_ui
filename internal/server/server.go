@@ -14,6 +14,7 @@ import (
 	"hamvoipconfiggui/internal/auth"
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/nodedb"
+	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/sounds"
 	"hamvoipconfiggui/internal/system"
 )
@@ -50,6 +51,12 @@ type Server struct {
 	// internal/sounds's package doc for the distinction. Always non-nil.
 	sounds *sounds.Store
 
+	// soundSchedule holds the "Automation" tab's scheduled sound-playback
+	// entries — see internal/soundschedule's package doc for why these
+	// live outside rpt.conf, unlike scheduled connect/disconnect. Always
+	// non-nil.
+	soundSchedule *soundschedule.Store
+
 	// restartNeeded tracks whether any Asterisk config file has been
 	// saved since Asterisk was last (re)started — set via
 	// config.Store.SetChangeHook (every save is to an Asterisk/app_rpt
@@ -85,8 +92,11 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 // is where the last settings sent to it are recorded (see internal/sa818).
 // soundsCustomDir/soundsStockDir/soxTool configure the "Tones & Audio"
 // section's sound file management — see internal/sounds's package doc.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool)}
+// soundSchedulePath is where the "Automation" tab's scheduled
+// sound-playback entries are persisted — see internal/soundschedule's
+// package doc.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath)}
 	s.live = newLiveHub(s)
 	store.SetChangeHook(func(string) { s.restartNeeded.Store(true) })
 
@@ -162,6 +172,10 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/courtesy-tones", s.requireAuth(s.handleNodeCourtesyToneSave))
 	s.mux.HandleFunc("POST /nodes/{number}/sounds/upload", s.requireAuth(s.handleNodeSoundUpload))
 	s.mux.HandleFunc("POST /nodes/{number}/sounds/{name}/delete", s.requireAuth(s.handleNodeSoundDelete))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/connections", s.requireAuth(s.handleNodeAutomationConnectionSave))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/connections/{macronum}/delete", s.requireAuth(s.handleNodeAutomationConnectionDelete))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/sounds", s.requireAuth(s.handleNodeAutomationSoundSave))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/sounds/{id}/delete", s.requireAuth(s.handleNodeAutomationSoundDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))

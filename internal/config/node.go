@@ -64,6 +64,20 @@ type Node struct {
 	UnlinkedCT  string // courtesy tone played when not connected to any other node
 	RemoteCT    string // courtesy tone played when a remote base is connected locally
 	LinkUnkeyCT string // courtesy tone played when a connected/linked node unkeys
+
+	// Scheduler names this node's [scheduleNNNN] section — app_rpt's own
+	// native cron-like mechanism (entries there are "<macro number> = MM
+	// HH DOM MON DOW"; Asterisk itself dials the referenced macro when the
+	// time matches, no separate process needed). Unlike
+	// functions/macro/telemetry/morse, a blank Scheduler is never
+	// dangerous on its own — app_rpt simply has nothing scheduled, there's
+	// no shared bare-name section it silently falls back to relying on —
+	// so this is read directly here but, like UnlinkedCT etc., kept out of
+	// nodeFields/SaveNode's whole-node resubmit: it's written only through
+	// the narrow SetNodeScheduler, by the "Automation" tab's own scoped
+	// form, so an ordinary Setup-tab save (which never carries a
+	// "scheduler" field at all) can never blank it out.
+	Scheduler string
 }
 
 // nodeFields lists the per-node-section keys mapped onto Node, in the
@@ -147,6 +161,9 @@ func (s *Store) LoadNode(number string) (*Node, error) {
 			*fld.get(n) = v
 		}
 	}
+	if v, ok := f.Get(number, "scheduler"); ok {
+		n.Scheduler = v
+	}
 	return n, nil
 }
 
@@ -223,14 +240,47 @@ func (s *Store) SetCourtesyToneAssignments(number, unlinkedCT, remoteCT, linkUnk
 	return s.save(RptConfFile, f)
 }
 
-// companionSections lists the four per-node auxiliary section types a
-// real HamVoIP node needs to actually do anything: functions is its
-// DTMF command map (what makes *3<node> etc. work at all), macro its
-// saved multi-step sequences, telemetry its courtesy tones, morse its
-// CW ID sound set. defaultName is the bare section name app_rpt itself
-// falls back to using when a node's own field is left blank — matching
-// that exactly matters, since a node whose field is blank is silently
-// relying on that section existing, not on having no command set.
+// SetNodeScheduler updates just the scheduler key on number's own rpt.conf
+// section — the narrow-update counterpart to SaveNode's whole-node
+// rewrite, used to self-heal a blank Node.Scheduler (a node created before
+// the "Automation" tab existed) to a correctly-named section the first
+// time an automation entry is saved for it, without risking any other
+// field (see the Scheduler field's own doc comment for why it can't go
+// through SaveNode). Blank clears the key, leaving the node with no
+// scheduled events.
+func (s *Store) SetNodeScheduler(number, section string) error {
+	if !nodeSectionRe.MatchString(number) {
+		return fmt.Errorf("config: node number must be numeric")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, err := s.load(RptConfFile)
+	if err != nil {
+		return err
+	}
+	if !f.HasSection(number) {
+		return fmt.Errorf("config: node %s not found in %s", number, RptConfFile)
+	}
+	if section == "" {
+		f.Delete(number, "scheduler")
+	} else {
+		f.Set(number, "scheduler", section)
+	}
+	return s.save(RptConfFile, f)
+}
+
+// companionSections lists the five per-node auxiliary section types a
+// real HamVoIP node uses: functions is its DTMF command map (what makes
+// *3<node> etc. work at all), macro its saved multi-step sequences,
+// telemetry its courtesy tones, morse its CW ID sound set, scheduler its
+// app_rpt-native day/time schedule (see the Scheduler field's doc
+// comment). defaultName is the bare section name app_rpt itself falls
+// back to using when a node's own field is left blank — matching that
+// exactly matters for the first four, since a node whose field is blank
+// is silently relying on that section existing, not on having no command
+// set; scheduler has no such danger (a blank one is simply "nothing
+// scheduled"), but Clone/Normalize still give a cloned/repaired node its
+// own correctly-named section for consistency with the other four.
 var companionSections = []struct {
 	nodeKey     string
 	defaultName string
@@ -239,6 +289,7 @@ var companionSections = []struct {
 	{"macro", "macro"},
 	{"telemetry", "telemetry"},
 	{"morse", "morse"},
+	{"scheduler", "schedule"},
 }
 
 // CloneNodeConfig gives dstNumber its own working copy of srcNumber's

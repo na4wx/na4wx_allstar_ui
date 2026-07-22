@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/sounds"
 	"hamvoipconfiggui/internal/system"
 )
@@ -106,6 +107,13 @@ type nodeFormData struct {
 	TelemetryRows []telemetryRow
 	CTKeys        []string // courtesy-tone keys (ct1-ct8) present in this node's telemetry section, for the unlinkedct/remotect/linkunkeyct pickers
 	SoundFiles    []sounds.File
+
+	// Automation: scheduled connect/disconnect rules (native app_rpt
+	// scheduler, see automation.go) and scheduled sound playback (its own
+	// ticker, see soundschedule.go).
+	SchedulerSect         string
+	AutomationConnections []automationRow
+	SoundSchedules        []soundschedule.Entry
 }
 
 // radioChannelOption is one entry in the RX/TX channel dropdown: a
@@ -214,6 +222,8 @@ func (s *Server) renderNodeEditPageWithNode(w http.ResponseWriter, r *http.Reque
 	data.pageData = pd
 	s.populateNodeLiveStatus(r, &data)
 	s.populateNodeTelemetry(&data)
+	s.populateNodeAutomation(&data)
+	s.populateNodeSoundSchedule(&data)
 	s.render(w, "node_form.html", data)
 }
 
@@ -310,6 +320,8 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 		data.Device = device
 		s.populateNodeLiveStatus(r, &data)
 		s.populateNodeTelemetry(&data)
+		s.populateNodeAutomation(&data)
+		s.populateNodeSoundSchedule(&data)
 		s.render(w, "node_form.html", data)
 		return
 	}
@@ -507,6 +519,7 @@ var companionSectionSpecs = []struct {
 	{func(n *config.Node) string { return n.Macro }, "macro"},
 	{func(n *config.Node) string { return n.Telemetry }, "telemetry"},
 	{func(n *config.Node) string { return n.Morse }, "morse"},
+	{func(n *config.Node) string { return n.Scheduler }, "schedule"},
 }
 
 // handleNodeDelete removes number's rpt.conf entry plus everything else
@@ -574,6 +587,11 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 		} else if err := s.store.DeleteRadioDevice(deviceRef.File, deviceRef.Name); err != nil {
 			failed = append(failed, "radio device: "+err.Error())
 		}
+	}
+	// Scheduled sound-playback entries live outside rpt.conf (see
+	// internal/soundschedule), so nothing above cleans them up.
+	if err := s.soundSchedule.DeleteByNode(number); err != nil {
+		failed = append(failed, "scheduled sound playback: "+err.Error())
 	}
 	if len(failed) > 0 {
 		s.renderHome(w, r, flash("error", "Node "+number+" deleted, but some related config wasn't fully cleaned up: "+strings.Join(failed, "; ")+" — check manually via Raw Config."))
