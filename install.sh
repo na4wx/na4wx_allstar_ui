@@ -46,6 +46,7 @@ command -v git >/dev/null 2>&1 || { log "Installing git"; pacman_install git; }
 command -v make >/dev/null 2>&1 || { log "Installing make"; pacman_install make; }
 command -v curl >/dev/null 2>&1 || { log "Installing curl"; pacman_install curl; }
 command -v tar >/dev/null 2>&1 || { log "Installing tar"; pacman_install tar; }
+command -v espeak-ng >/dev/null 2>&1 || { log "Installing espeak-ng (TTS fallback)"; pacman_install espeak-ng; }
 
 version_ge() { # version_ge A B => A >= B
 	[ "$1" = "$2" ] && return 0
@@ -131,7 +132,7 @@ case "$(uname -m)" in
 	armv7l)
 		PIPER_ARCH="armv7l" ;;
 	armv6l|arm)
-		log "Piper has no build for 32-bit armv6 (Pi Zero/1) — skipping. Everything else in this app works normally; just the \"Create from text\" sound generator won't be available."
+		log "Piper has no build for 32-bit armv6 (Pi Zero/1) — skipping Piper setup. The app will use espeak-ng as the text-to-speech fallback."
 		;;
 	*)
 		log "Piper has no known build for $(uname -m) — skipping text-to-speech setup."
@@ -163,7 +164,23 @@ if [ -n "$PIPER_ARCH" ]; then
 		rm -rf "$TMP"
 	fi
 
+	PIPER_READY=0
 	if [ -x "$PIPER_INSTALL_DIR/piper" ]; then
+		set +e
+		PIPER_CHECK_OUTPUT=$("$PIPER_INSTALL_DIR/piper" --help 2>&1)
+		PIPER_CHECK_STATUS=$?
+		set -e
+		if [ "$PIPER_CHECK_STATUS" = "0" ]; then
+			PIPER_READY=1
+		else
+			log "warning: Piper is installed but cannot run on this system; skipping text-to-speech voice setup."
+			log "Piper check output: ${PIPER_CHECK_OUTPUT//$'\n'/ | }"
+			log "This is usually a glibc/libstdc++ version mismatch in older HamVoIP images."
+			log "The app will fall back to espeak-ng for \"Create from text\" where available."
+		fi
+	fi
+
+	if [ "$PIPER_READY" = "1" ]; then
 		mkdir -p "$PIPER_VOICES_DIR"
 		if [ -f "$PIPER_VOICES_DIR/$PIPER_VOICE.onnx" ]; then
 			log "Voice $PIPER_VOICE already downloaded"

@@ -421,6 +421,7 @@
   </div>
   {{if .TTSVoices}}
   <form method="post" action="/nodes/{{.Node.Number}}/sounds/tts">
+    <input type="hidden" name="tts_engine" id="tts_engine" value="{{.TTSEngine}}">
     <div class="row">
       <div class="field">
         <label for="tts_sound_name">Name</label>
@@ -443,7 +444,10 @@
       <button type="submit" class="primary">Generate &amp; save</button>
       <span class="hint" data-tts-preview-status></span>
     </div>
+    {{if .TTSNotice}}<p class="hint" style="margin-top:8px">{{.TTSNotice}}</p>{{end}}
   </form>
+  {{else if .TTSError}}
+  <p class="hint">{{.TTSError}}</p>
   {{else}}
   <p class="hint">No text-to-speech voices downloaded yet. Re-run this app's <code>install.sh</code> on the Pi to fetch Piper and a default voice automatically, or download a specific voice manually into <code>/etc/hamvoip-gui/piper-voices/</code> from <a href="https://huggingface.co/rhasspy/piper-voices">huggingface.co/rhasspy/piper-voices</a> (both the <code>.onnx</code> file and its matching <code>.onnx.json</code>), then reload this page.</p>
   {{end}}

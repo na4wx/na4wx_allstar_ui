@@ -94,6 +94,89 @@ func FindVoice(dir, name string) (Voice, bool, error) {
 // card write.
 const synthesizeTimeout = 30 * time.Second
 
+// checkTimeout bounds a quick Piper smoke-test invocation.
+const checkTimeout = 5 * time.Second
+
+// CheckTool runs `tool <args...>` to confirm a TTS backend is actually
+// runnable on this system (not just present on disk), returning the
+// command's combined output either way for troubleshooting.
+func CheckTool(ctx context.Context, tool string, args ...string) (output string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+
+	if len(args) == 0 {
+		args = []string{"--help"}
+	}
+	cmd := exec.CommandContext(ctx, tool, args...)
+	b, runErr := cmd.CombinedOutput()
+	output = string(b)
+	if runErr != nil {
+		return output, fmt.Errorf("%s: %w", tool, runErr)
+	}
+	return output, nil
+}
+
+// ListESpeakVoices lists installed espeak-ng voice names sorted by name.
+// It shells out to `espeak-ng --voices` and parses the documented
+// tabular output.
+func ListESpeakVoices(ctx context.Context, tool string) (voices []Voice, output string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, tool, "--voices")
+	b, runErr := cmd.CombinedOutput()
+	output = string(b)
+	if runErr != nil {
+		return nil, output, fmt.Errorf("%s: %w", tool, runErr)
+	}
+
+	seen := map[string]struct{}{}
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Pty") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		name := fields[3]
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		voices = append(voices, Voice{Name: name, ModelPath: name})
+	}
+	sort.Slice(voices, func(i, j int) bool { return voices[i].Name < voices[j].Name })
+	if len(voices) == 0 {
+		return nil, output, fmt.Errorf("%s: no voices found", tool)
+	}
+	return voices, output, nil
+}
+
+// SynthesizeESpeak renders text using espeak-ng and returns WAV audio
+// bytes from stdout.
+func SynthesizeESpeak(ctx context.Context, tool, voiceName, text string) (wav []byte, output string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, synthesizeTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, tool, "--stdout", "-v", voiceName, text)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	wav, runErr := cmd.Output()
+	output = stderr.String()
+	if runErr != nil {
+		return nil, output, fmt.Errorf("%s: %w", tool, runErr)
+	}
+	if len(wav) == 0 {
+		return nil, output, fmt.Errorf("%s: no audio output", tool)
+	}
+	return wav, output, nil
+}
+
 // Synthesize renders text using the voice model at modelPath, via `<tool>
 // --model <modelPath> --output_file <tmpfile>` with text piped to stdin
 // (Piper's own documented CLI form), returning the generated WAV audio.

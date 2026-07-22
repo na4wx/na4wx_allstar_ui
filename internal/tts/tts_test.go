@@ -117,3 +117,106 @@ func TestSynthesizeFailure(t *testing.T) {
 		t.Errorf("output = %q, want it to include the tool's message", output)
 	}
 }
+
+func TestCheckToolSuccess(t *testing.T) {
+	tool := fakePiper(t, true, "piper help")
+	output, err := CheckTool(context.Background(), tool)
+	if err != nil {
+		t.Fatalf("CheckTool() error = %v", err)
+	}
+	if !strings.Contains(output, "piper help") {
+		t.Errorf("output = %q, want it to include the tool's message", output)
+	}
+}
+
+func TestCheckToolFailure(t *testing.T) {
+	tool := fakePiper(t, false, "GLIBCXX_3.4.26 not found")
+	output, err := CheckTool(context.Background(), tool)
+	if err == nil {
+		t.Fatal("CheckTool() error = nil, want an error when tool exits non-zero")
+	}
+	if !strings.Contains(err.Error(), "fake-piper") {
+		t.Errorf("error = %v, want it to name the tool", err)
+	}
+	if !strings.Contains(output, "GLIBCXX_3.4.26 not found") {
+		t.Errorf("output = %q, want it to include the tool's message", output)
+	}
+}
+
+func fakeESpeak(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-espeak-ng")
+	script := `#!/bin/sh
+case "$1" in
+  --version)
+    echo "eSpeak NG text-to-speech: 1.52.0"
+    exit 0
+    ;;
+  --voices)
+    cat <<'EOF'
+Pty Language Age/Gender VoiceName          File          Other Languages
+ 5  en-us    M          en-us              en-us
+ 5  en-gb    M          en-gb              en-gb
+EOF
+    exit 0
+    ;;
+  --stdout)
+    if [ "$3" = "missing" ]; then
+      echo "voice not found" >&2
+      exit 1
+    fi
+    printf 'RIFFfakewavbytes'
+    exit 0
+    ;;
+esac
+echo "unexpected args" >&2
+exit 1
+`
+	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake espeak: %v", err)
+	}
+	return path
+}
+
+func TestListESpeakVoices(t *testing.T) {
+	tool := fakeESpeak(t)
+	voices, output, err := ListESpeakVoices(context.Background(), tool)
+	if err != nil {
+		t.Fatalf("ListESpeakVoices() error = %v", err)
+	}
+	if !strings.Contains(output, "VoiceName") {
+		t.Errorf("output = %q, want espeak --voices table", output)
+	}
+	if len(voices) != 2 {
+		t.Fatalf("got %d voices, want 2", len(voices))
+	}
+	if voices[0].Name != "en-gb" || voices[1].Name != "en-us" {
+		t.Fatalf("voices = %+v, want sorted [en-gb, en-us]", voices)
+	}
+}
+
+func TestSynthesizeESpeakSuccess(t *testing.T) {
+	tool := fakeESpeak(t)
+	wav, output, err := SynthesizeESpeak(context.Background(), tool, "en-us", "hello world")
+	if err != nil {
+		t.Fatalf("SynthesizeESpeak() error = %v", err)
+	}
+	if len(wav) == 0 {
+		t.Fatal("wav is empty")
+	}
+	if output != "" {
+		t.Errorf("output = %q, want empty stderr on success", output)
+	}
+}
+
+func TestSynthesizeESpeakFailure(t *testing.T) {
+	tool := fakeESpeak(t)
+	_, output, err := SynthesizeESpeak(context.Background(), tool, "missing", "hello")
+	if err == nil {
+		t.Fatal("SynthesizeESpeak() error = nil, want non-zero tool error")
+	}
+	if !strings.Contains(output, "voice not found") {
+		t.Errorf("output = %q, want tool stderr", output)
+	}
+}

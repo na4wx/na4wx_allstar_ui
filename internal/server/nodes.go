@@ -108,7 +108,10 @@ type nodeFormData struct {
 	TelemetryRows []telemetryRow
 	CTKeys        []string // courtesy-tone keys (ct1-ct8) present in this node's telemetry section, for the unlinkedct/remotect/linkunkeyct pickers
 	SoundFiles    []sounds.File
-	TTSVoices     []tts.Voice // downloaded Piper voices offered by "Create from text" — see internal/tts's package doc
+	TTSVoices     []tts.Voice // voices offered by "Create from text" from either Piper models or espeak-ng fallback
+	TTSEngine     string      // active engine for this page render: "piper" or "espeak-ng"
+	TTSNotice     string      // non-fatal note, e.g. piper unavailable and espeak-ng fallback is in use
+	TTSError      string      // why TTS is unavailable (e.g. Piper binary exists but can't start on this system)
 
 	// Automation: scheduled connect/disconnect rules (native app_rpt
 	// scheduler, see automation.go) and scheduled sound playback (its own

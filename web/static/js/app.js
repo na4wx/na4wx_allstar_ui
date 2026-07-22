@@ -500,6 +500,7 @@ const confirmModal = (function () {
   const btn = document.querySelector("[data-tts-preview]");
   if (!btn) return;
   const voiceField = document.getElementById("tts_voice");
+  const engineField = document.getElementById("tts_engine");
   const textField = document.getElementById("tts_text");
   const status = document.querySelector("[data-tts-preview-status]");
   const audio = new Audio();
@@ -516,7 +517,11 @@ const confirmModal = (function () {
     btn.textContent = "Generating…";
     if (status) status.textContent = "";
     try {
-      const body = new URLSearchParams({ tts_voice: voiceField.value, tts_text: text });
+      const body = new URLSearchParams({
+        tts_voice: voiceField.value,
+        tts_text: text,
+        tts_engine: engineField ? engineField.value : "",
+      });
       const resp = await fetch(btn.getAttribute("data-tts-preview"), { method: "POST", body });
       if (!resp.ok) {
         if (status) status.textContent = await resp.text();

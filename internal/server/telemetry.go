@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +15,10 @@ import (
 // recording as an uncompressed WAV, small enough that one request can't
 // meaningfully fill the disk.
 const soundUploadMaxBytes = 20 << 20
+
+// espeakFallbackTool is used when Piper cannot run on older system
+// libraries but text-to-speech is still desired.
+const espeakFallbackTool = "espeak-ng"
 
 // telemetryRow is one entry in the "Tones & Audio" editor. Mode is
 // decided from the entry's actual current value, not its key name —
@@ -162,6 +167,96 @@ func courtesyToneKeys(entries []config.TelemetryEntry) []string {
 	return keys
 }
 
+func formatTTSError(prefix string, output string) string {
+	msg := prefix
+	if trimmed := strings.TrimSpace(output); trimmed != "" {
+		msg += " — " + trimmed
+	}
+	return msg
+}
+
+func findVoiceByName(voices []tts.Voice, name string) (tts.Voice, bool) {
+	for _, v := range voices {
+		if v.Name == name {
+			return v, true
+		}
+	}
+	return tts.Voice{}, false
+}
+
+// resolveTTSBackend chooses which engine this request/page should use:
+// Piper first when healthy and voices exist, otherwise espeak-ng.
+func (s *Server) resolveTTSBackend(ctx context.Context) (engine string, voices []tts.Voice, note string, errMsg string) {
+	var piperErr string
+	if piperVoices, err := tts.ListVoices(s.ttsVoicesDir); err == nil && len(piperVoices) > 0 {
+		if output, checkErr := tts.CheckTool(ctx, s.ttsTool, "--help"); checkErr == nil {
+			return "piper", piperVoices, "", ""
+		} else {
+			piperErr = formatTTSError("Piper couldn't start", output)
+		}
+	}
+
+	espeakCheckOut, espeakCheckErr := tts.CheckTool(ctx, espeakFallbackTool, "--version")
+	if espeakCheckErr == nil {
+		espeakVoices, espeakVoiceOut, espeakVoicesErr := tts.ListESpeakVoices(ctx, espeakFallbackTool)
+		if espeakVoicesErr == nil {
+			note := ""
+			if piperErr != "" {
+				note = "Using espeak-ng fallback because Piper is unavailable on this system."
+			}
+			return "espeak-ng", espeakVoices, note, ""
+		}
+		return "", nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng voices could not be listed", espeakVoiceOut)
+	}
+
+	if piperErr != "" {
+		return "", nil, "", "Text-to-speech is unavailable. " + piperErr + " " + formatTTSError("espeak-ng also couldn't start", espeakCheckOut)
+	}
+	return "", nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng couldn't start", espeakCheckOut)
+}
+
+func (s *Server) synthesizeWithEngine(ctx context.Context, engine, voiceName, text string) (wav []byte, output string, userErr string, err error) {
+	switch engine {
+	case "piper":
+		voice, ok, findErr := tts.FindVoice(s.ttsVoicesDir, voiceName)
+		if findErr != nil {
+			return nil, "", "", findErr
+		}
+		if !ok {
+			return nil, "", "Pick a voice — none selected, or it's no longer available", nil
+		}
+		if checkOut, checkErr := tts.CheckTool(ctx, s.ttsTool, "--help"); checkErr != nil {
+			return nil, "", formatTTSError("Text-to-speech is unavailable because Piper couldn't start", checkOut), nil
+		}
+		wav, output, err = tts.Synthesize(ctx, s.ttsTool, voice.ModelPath, text)
+		return wav, output, "", err
+
+	case "espeak-ng":
+		if checkOut, checkErr := tts.CheckTool(ctx, espeakFallbackTool, "--version"); checkErr != nil {
+			return nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng couldn't start", checkOut), nil
+		}
+		espeakVoices, espeakVoiceOut, listErr := tts.ListESpeakVoices(ctx, espeakFallbackTool)
+		if listErr != nil {
+			return nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng voices could not be listed", espeakVoiceOut), nil
+		}
+		if _, ok := findVoiceByName(espeakVoices, voiceName); !ok {
+			return nil, "", "Pick a voice — none selected, or it's no longer available", nil
+		}
+		wav, output, err = tts.SynthesizeESpeak(ctx, espeakFallbackTool, voiceName, text)
+		return wav, output, "", err
+
+	default:
+		resolvedEngine, voices, _, msg := s.resolveTTSBackend(ctx)
+		if msg != "" {
+			return nil, "", msg, nil
+		}
+		if resolvedEngine == "espeak-ng" && len(voices) > 0 && voiceName == "" {
+			voiceName = voices[0].Name
+		}
+		return s.synthesizeWithEngine(ctx, resolvedEngine, voiceName, text)
+	}
+}
+
 // populateNodeTelemetry fills data's "Tones & Audio" fields: the node's
 // telemetry entries as friendly rows (see buildTelemetryRows), the
 // combined custom+stock sound list for the picker, and whichever
@@ -186,8 +281,16 @@ func (s *Server) populateNodeTelemetry(data *nodeFormData) {
 	if files, err := s.sounds.ListAll(); err == nil {
 		data.SoundFiles = files
 	}
-	if voices, err := tts.ListVoices(s.ttsVoicesDir); err == nil {
-		data.TTSVoices = voices
+	engine, voices, note, errMsg := s.resolveTTSBackend(context.Background())
+	if errMsg != "" {
+		data.TTSError = errMsg
+		return
+	}
+	data.TTSEngine = engine
+	data.TTSVoices = voices
+	data.TTSNotice = note
+	if len(data.TTSVoices) == 0 {
+		data.TTSError = "Text-to-speech is unavailable: no voices are currently available"
 	}
 }
 
@@ -331,13 +434,13 @@ func (s *Server) handleNodeSoundUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleNodeSoundTTS generates a custom sound file from typed text using
-// a downloaded Piper voice (see internal/tts's package doc), then saves
+// whichever TTS backend is active (Piper first, espeak-ng fallback), then saves
 // it through the exact same sounds.Store.Upload path a manual upload
 // uses — synthesis just produces a WAV, everything after that (name
 // validation, sox transcoding, landing in the custom directory) is
-// identical either way. The submitted voice name is only ever resolved
-// through tts.FindVoice against this box's own downloaded voices, never
-// used to build a file path directly.
+// identical either way. Voice names are always resolved by listing the
+// backend's own available voices first; they are never used to build
+// file paths directly from form input.
 func (s *Server) handleNodeSoundTTS(w http.ResponseWriter, r *http.Request) {
 	number := r.PathValue("number")
 	if _, err := s.store.LoadNode(number); err != nil {
@@ -358,22 +461,16 @@ func (s *Server) handleNodeSoundTTS(w http.ResponseWriter, r *http.Request) {
 		s.renderNodeEditPage(w, r, number, flash("error", "Enter the text to speak"))
 		return
 	}
-	voice, ok, err := tts.FindVoice(s.ttsVoicesDir, r.FormValue("tts_voice"))
-	if err != nil {
-		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
-		return
-	}
-	if !ok {
-		s.renderNodeEditPage(w, r, number, flash("error", "Pick a voice — none selected, or it's no longer available"))
-		return
-	}
+	voiceName := strings.TrimSpace(r.FormValue("tts_voice"))
+	engine := strings.TrimSpace(r.FormValue("tts_engine"))
 
-	wav, output, err := tts.Synthesize(r.Context(), s.ttsTool, voice.ModelPath, text)
+	wav, output, userErr, err := s.synthesizeWithEngine(r.Context(), engine, voiceName, text)
+	if userErr != "" {
+		s.renderNodeEditPage(w, r, number, flash("error", userErr))
+		return
+	}
 	if err != nil {
-		msg := "Couldn't generate speech: " + err.Error()
-		if output != "" {
-			msg += " — " + output
-		}
+		msg := formatTTSError("Couldn't generate speech: "+err.Error(), output)
 		s.renderNodeEditPage(w, r, number, flash("error", msg))
 		return
 	}
@@ -386,9 +483,9 @@ func (s *Server) handleNodeSoundTTS(w http.ResponseWriter, r *http.Request) {
 
 // handleNodeSoundTTSPreview synthesizes speech for the submitted
 // voice+text and returns it directly as WAV bytes — no sox transcoding,
-// no save. Piper's own WAV output is already linear-PCM and
-// browser-playable as-is, so unlike the save path (which needs sox's
-// 8kHz mono mu-law for app_rpt) this can return exactly what Piper
+// no save. Both backends return WAV output that's browser-playable as-is,
+// so unlike the save path (which needs sox's
+// 8kHz mono mu-law for app_rpt) this can return exactly what the backend
 // produced. Called from the "Preview" button via fetch(), not a normal
 // form submission, so errors go back as a plain text body/status code
 // for the page's own JS to show, not a flash + full page re-render.
@@ -407,21 +504,16 @@ func (s *Server) handleNodeSoundTTSPreview(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Enter the text to speak", http.StatusBadRequest)
 		return
 	}
-	voice, ok, err := tts.FindVoice(s.ttsVoicesDir, r.FormValue("tts_voice"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	voiceName := strings.TrimSpace(r.FormValue("tts_voice"))
+	engine := strings.TrimSpace(r.FormValue("tts_engine"))
+
+	wav, output, userErr, err := s.synthesizeWithEngine(r.Context(), engine, voiceName, text)
+	if userErr != "" {
+		http.Error(w, userErr, http.StatusServiceUnavailable)
 		return
 	}
-	if !ok {
-		http.Error(w, "Pick a voice — none selected, or it's no longer available", http.StatusBadRequest)
-		return
-	}
-	wav, output, err := tts.Synthesize(r.Context(), s.ttsTool, voice.ModelPath, text)
 	if err != nil {
-		msg := err.Error()
-		if output != "" {
-			msg += " — " + output
-		}
+		msg := formatTTSError(err.Error(), output)
 		http.Error(w, msg, http.StatusInternalServerError)
 		return
 	}
