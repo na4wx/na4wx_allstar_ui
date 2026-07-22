@@ -33,16 +33,24 @@ import (
 	"time"
 )
 
-// Voice is one downloaded Piper voice model.
+// Voice is one downloaded Piper voice model, or (for the espeak-ng
+// fallback) one entry from `espeak-ng --voices`.
 type Voice struct {
-	// Name is the bare model name with no directory or extension, e.g.
-	// "en_US-lessac-medium" — how the voice is identified in the UI and
-	// submitted back in a form.
+	// Name is how the voice is identified in the UI and submitted back in
+	// a form: for Piper, the bare model name with no directory or
+	// extension (e.g. "en_US-lessac-medium"); for espeak-ng, the
+	// human-readable "VoiceName" column (e.g. "Mandarin").
 	Name string
-	// ModelPath is the full path to the voice's ".onnx" file, passed to
-	// piper's --model flag. Never taken directly from user input — always
-	// resolved by looking up a submitted Name against ListVoices, so a
-	// request can't point piper at an arbitrary file.
+	// ModelPath is what's actually passed to the TTS tool to select this
+	// voice: for Piper, the full path to the voice's ".onnx" file (passed
+	// to --model); for espeak-ng, the "File" column from --voices (e.g.
+	// "sit/cmn"), passed to -v — espeak-ng's -v flag takes that
+	// identifier, not the display VoiceName, confirmed against a real
+	// `espeak-ng --voices` (passing the VoiceName column, e.g. "Mandarin",
+	// fails with "Error: The specified espeak-ng voice does not exist").
+	// Never taken directly from user input — always resolved by looking
+	// up a submitted Name against ListVoices/ListESpeakVoices, so a
+	// request can't point the tool at an arbitrary voice string.
 	ModelPath string
 }
 
@@ -137,18 +145,18 @@ func ListESpeakVoices(ctx context.Context, tool string) (voices []Voice, output 
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 4 {
+		if len(fields) < 5 {
 			continue
 		}
-		name := fields[3]
-		if name == "" {
+		name, id := fields[3], fields[4]
+		if name == "" || id == "" {
 			continue
 		}
-		if _, ok := seen[name]; ok {
+		if _, ok := seen[id]; ok {
 			continue
 		}
-		seen[name] = struct{}{}
-		voices = append(voices, Voice{Name: name, ModelPath: name})
+		seen[id] = struct{}{}
+		voices = append(voices, Voice{Name: name, ModelPath: id})
 	}
 	sort.Slice(voices, func(i, j int) bool { return voices[i].Name < voices[j].Name })
 	if len(voices) == 0 {
@@ -158,12 +166,15 @@ func ListESpeakVoices(ctx context.Context, tool string) (voices []Voice, output 
 }
 
 // SynthesizeESpeak renders text using espeak-ng and returns WAV audio
-// bytes from stdout.
-func SynthesizeESpeak(ctx context.Context, tool, voiceName, text string) (wav []byte, output string, err error) {
+// bytes from stdout. voiceID must be a Voice.ModelPath from
+// ListESpeakVoices (the --voices table's "File" column), not a
+// Voice.Name — passing the display name fails with "the specified
+// espeak-ng voice does not exist".
+func SynthesizeESpeak(ctx context.Context, tool, voiceID, text string) (wav []byte, output string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, synthesizeTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, tool, "--stdout", "-v", voiceName, text)
+	cmd := exec.CommandContext(ctx, tool, "--stdout", "-v", voiceID, text)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	wav, runErr := cmd.Output()

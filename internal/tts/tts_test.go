@@ -155,15 +155,16 @@ case "$1" in
     ;;
   --voices)
     cat <<'EOF'
-Pty Language Age/Gender VoiceName          File          Other Languages
- 5  en-us    M          en-us              en-us
- 5  en-gb    M          en-gb              en-gb
+Pty Language       Age/Gender VoiceName          File                 Other Languages
+ 5  en-us          --/M      English_(America)  en/en-us
+ 5  en-gb          --/M      English_(Britain)  en/en-gb
+ 5  cmn            --/M      Mandarin           zh/cmn               (zh-cmn 5)(zh 5)
 EOF
     exit 0
     ;;
   --stdout)
-    if [ "$3" = "missing" ]; then
-      echo "voice not found" >&2
+    if [ "$3" = "missing" ] || [ "$3" = "Mandarin" ]; then
+      echo "Error: The specified espeak-ng voice does not exist." >&2
       exit 1
     fi
     printf 'RIFFfakewavbytes'
@@ -188,11 +189,18 @@ func TestListESpeakVoices(t *testing.T) {
 	if !strings.Contains(output, "VoiceName") {
 		t.Errorf("output = %q, want espeak --voices table", output)
 	}
-	if len(voices) != 2 {
-		t.Fatalf("got %d voices, want 2", len(voices))
+	if len(voices) != 3 {
+		t.Fatalf("got %d voices, want 3", len(voices))
 	}
-	if voices[0].Name != "en-gb" || voices[1].Name != "en-us" {
-		t.Fatalf("voices = %+v, want sorted [en-gb, en-us]", voices)
+	want := []Voice{
+		{Name: "English_(America)", ModelPath: "en/en-us"},
+		{Name: "English_(Britain)", ModelPath: "en/en-gb"},
+		{Name: "Mandarin", ModelPath: "zh/cmn"},
+	}
+	for i, w := range want {
+		if voices[i] != w {
+			t.Errorf("voices[%d] = %+v, want %+v", i, voices[i], w)
+		}
 	}
 }
 
@@ -216,7 +224,22 @@ func TestSynthesizeESpeakFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("SynthesizeESpeak() error = nil, want non-zero tool error")
 	}
-	if !strings.Contains(output, "voice not found") {
+	if !strings.Contains(output, "does not exist") {
 		t.Errorf("output = %q, want tool stderr", output)
+	}
+}
+
+// TestSynthesizeESpeakRejectsDisplayName guards against the regression
+// this app actually hit: passing a Voice.Name (e.g. "Mandarin", the
+// --voices table's display column) as -v fails, because espeak-ng only
+// recognizes the "File" column (e.g. "zh/cmn") there. Callers must use
+// the Voice.ModelPath returned by ListESpeakVoices, not Name.
+func TestSynthesizeESpeakRejectsDisplayName(t *testing.T) {
+	tool := fakeESpeak(t)
+	if _, _, err := SynthesizeESpeak(context.Background(), tool, "Mandarin", "hello"); err == nil {
+		t.Fatal("SynthesizeESpeak() with a display name error = nil, want an error")
+	}
+	if _, _, err := SynthesizeESpeak(context.Background(), tool, "zh/cmn", "hello"); err != nil {
+		t.Fatalf("SynthesizeESpeak() with the real ModelPath error = %v, want success", err)
 	}
 }

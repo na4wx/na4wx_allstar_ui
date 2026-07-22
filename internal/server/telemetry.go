@@ -254,10 +254,11 @@ func (s *Server) synthesizeWithEngine(ctx context.Context, engine, voiceName, te
 		if listErr != nil {
 			return nil, "", formatTTSError("Text-to-speech is unavailable because espeak-ng voices could not be listed", espeakVoiceOut), nil
 		}
-		if _, ok := findVoiceByName(espeakVoices, voiceName); !ok {
+		voice, ok := findVoiceByName(espeakVoices, voiceName)
+		if !ok {
 			return nil, "", "Pick a voice — none selected, or it's no longer available", nil
 		}
-		wav, output, err = tts.SynthesizeESpeak(ctx, espeakRuntimeTool, voiceName, text)
+		wav, output, err = tts.SynthesizeESpeak(ctx, espeakRuntimeTool, voice.ModelPath, text)
 		return wav, output, "", err
 
 	default:
