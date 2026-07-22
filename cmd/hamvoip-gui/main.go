@@ -35,6 +35,8 @@ func main() {
 	soundsStockDir := flag.String("sounds-stock-dir", "/var/lib/asterisk/sounds/rpt", "app_rpt's own built-in prompt library, offered as read-only pick-list options (e.g. \"rpt/callproceeding\") — never written to")
 	soxTool := flag.String("sox-tool", "sox", "path to the sox audio tool, or bare name if it's on PATH (used to transcode an uploaded sound file to the 8kHz mono format app_rpt expects)")
 	soundSchedulePath := flag.String("sound-schedule-file", "/etc/hamvoip-gui/sound-schedule.json", "path to store the \"Automation\" tab's scheduled sound-playback entries — these aren't an Asterisk-native mechanism (unlike scheduled connect/disconnect, which lives in rpt.conf itself), so this app tracks them here and fires them itself")
+	ttsTool := flag.String("tts-tool", "piper", "path to the Piper text-to-speech binary, or bare name if it's on PATH (used by the \"Create from text\" sound generator); see https://github.com/OHF-Voice/piper1-gpl")
+	ttsVoicesDir := flag.String("tts-voices-dir", "/etc/hamvoip-gui/piper-voices", "directory holding downloaded Piper voice models (.onnx files, e.g. via \"python3 -m piper.download_voices en_US-lessac-medium\") offered by the \"Create from text\" sound generator; empty until at least one voice is downloaded there")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -59,7 +61,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

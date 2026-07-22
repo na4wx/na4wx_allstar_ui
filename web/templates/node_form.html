@@ -410,6 +410,39 @@
     </div>
   </div>
 </form>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Create from text</h2>
+    {{template "help" "Generates a sound file by speaking typed text with a downloaded Piper voice, entirely on this box — no internet or account needed. Saved through the same conversion as an upload, so it works anywhere a sound field accepts one."}}
+  </div>
+  {{if .TTSVoices}}
+  <form method="post" action="/nodes/{{.Node.Number}}/sounds/tts">
+    <div class="row">
+      <div class="field">
+        <label for="tts_sound_name">Name</label>
+        <input type="text" id="tts_sound_name" name="sound_name" placeholder="weekend-net-reminder" required pattern="[a-zA-Z0-9_-]+">
+        <div class="hint">Letters, numbers, - and _ only. Generating with an existing name replaces it.</div>
+      </div>
+      <div class="field">
+        <label for="tts_voice">Voice</label>
+        <select id="tts_voice" name="tts_voice" required>
+          {{range .TTSVoices}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="tts_text">Text to speak</label>
+      <textarea id="tts_text" name="tts_text" rows="3" placeholder="The Tuesday night net starts at 8 PM." required></textarea>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Generate &amp; save</button>
+    </div>
+  </form>
+  {{else}}
+  <p class="hint">No text-to-speech voices downloaded yet. Download one on the Pi with, for example, <code>python3 -m piper.download_voices en_US-lessac-medium</code>, then reload this page.</p>
+  {{end}}
+</div>
 </div>
 
 <div data-tab-panel="network">

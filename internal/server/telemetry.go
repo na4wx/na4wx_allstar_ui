@@ -1,11 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/tts"
 )
 
 // soundUploadMaxBytes bounds one upload — generous for a short voice
@@ -161,10 +163,12 @@ func courtesyToneKeys(entries []config.TelemetryEntry) []string {
 }
 
 // populateNodeTelemetry fills data's "Tones & Audio" fields: the node's
-// telemetry entries as friendly rows (see buildTelemetryRows) and the
-// combined custom+stock sound list for the picker. Best-effort, like the
-// rest of this page's supplementary data — a read failure just leaves
-// the section looking empty rather than failing the whole page.
+// telemetry entries as friendly rows (see buildTelemetryRows), the
+// combined custom+stock sound list for the picker, and whichever
+// text-to-speech voices are available for "Create from text" (see
+// internal/tts's package doc). Best-effort, like the rest of this page's
+// supplementary data — a read failure just leaves the section looking
+// empty rather than failing the whole page.
 func (s *Server) populateNodeTelemetry(data *nodeFormData) {
 	node := data.Node
 	if node == nil || node.Number == "" {
@@ -181,6 +185,9 @@ func (s *Server) populateNodeTelemetry(data *nodeFormData) {
 	}
 	if files, err := s.sounds.ListAll(); err == nil {
 		data.SoundFiles = files
+	}
+	if voices, err := tts.ListVoices(s.ttsVoicesDir); err == nil {
+		data.TTSVoices = voices
 	}
 }
 
@@ -321,6 +328,60 @@ func (s *Server) handleNodeSoundUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.renderNodeEditPage(w, r, number, flash("ok", "Uploaded \""+name+"\" — pick it from any sound field below."))
+}
+
+// handleNodeSoundTTS generates a custom sound file from typed text using
+// a downloaded Piper voice (see internal/tts's package doc), then saves
+// it through the exact same sounds.Store.Upload path a manual upload
+// uses — synthesis just produces a WAV, everything after that (name
+// validation, sox transcoding, landing in the custom directory) is
+// identical either way. The submitted voice name is only ever resolved
+// through tts.FindVoice against this box's own downloaded voices, never
+// used to build a file path directly.
+func (s *Server) handleNodeSoundTTS(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("sound_name"))
+	if name == "" {
+		s.renderNodeEditPage(w, r, number, flash("error", "Enter a name for this sound file"))
+		return
+	}
+	text := strings.TrimSpace(r.FormValue("tts_text"))
+	if text == "" {
+		s.renderNodeEditPage(w, r, number, flash("error", "Enter the text to speak"))
+		return
+	}
+	voice, ok, err := tts.FindVoice(s.ttsVoicesDir, r.FormValue("tts_voice"))
+	if err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", err.Error()))
+		return
+	}
+	if !ok {
+		s.renderNodeEditPage(w, r, number, flash("error", "Pick a voice — none selected, or it's no longer available"))
+		return
+	}
+
+	wav, output, err := tts.Synthesize(r.Context(), s.ttsTool, voice.ModelPath, text)
+	if err != nil {
+		msg := "Couldn't generate speech: " + err.Error()
+		if output != "" {
+			msg += " — " + output
+		}
+		s.renderNodeEditPage(w, r, number, flash("error", msg))
+		return
+	}
+	if _, err := s.sounds.Upload(r.Context(), name, bytes.NewReader(wav)); err != nil {
+		s.renderNodeEditPage(w, r, number, flash("error", "Generated the audio, but couldn't convert it: "+err.Error()))
+		return
+	}
+	s.renderNodeEditPage(w, r, number, flash("ok", "Generated \""+name+"\" from text — pick it from any sound field below."))
 }
 
 // handleNodeSoundDelete removes one of the operator's own custom sound

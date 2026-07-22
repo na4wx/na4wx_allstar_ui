@@ -8,6 +8,7 @@ import (
 	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/sounds"
 	"hamvoipconfiggui/internal/system"
+	"hamvoipconfiggui/internal/tts"
 )
 
 // standardCommandSetSentinel is the "copy_from"/"from" value meaning
@@ -107,6 +108,7 @@ type nodeFormData struct {
 	TelemetryRows []telemetryRow
 	CTKeys        []string // courtesy-tone keys (ct1-ct8) present in this node's telemetry section, for the unlinkedct/remotect/linkunkeyct pickers
 	SoundFiles    []sounds.File
+	TTSVoices     []tts.Voice // downloaded Piper voices offered by "Create from text" — see internal/tts's package doc
 
 	// Automation: scheduled connect/disconnect rules (native app_rpt
 	// scheduler, see automation.go) and scheduled sound playback (its own
