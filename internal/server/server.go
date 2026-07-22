@@ -14,8 +14,8 @@ import (
 	"hamvoipconfiggui/internal/auth"
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/nodedb"
-	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/sounds"
+	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -65,6 +65,12 @@ type Server struct {
 	ttsTool      string
 	ttsVoicesDir string
 
+	// skywarnDir is where an operator-installed copy of SkywarnPlus
+	// lives (installed by install.sh, not by this app at runtime — see
+	// internal/skywarnplus's package doc). The "Weather Alerts" card on
+	// the Automation tab just checks whether something's there.
+	skywarnDir string
+
 	// restartNeeded tracks whether any Asterisk config file has been
 	// saved since Asterisk was last (re)started — set via
 	// config.Store.SetChangeHook (every save is to an Asterisk/app_rpt
@@ -103,9 +109,11 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 // soundSchedulePath is where the "Automation" tab's scheduled
 // sound-playback entries are persisted — see internal/soundschedule's
 // package doc. ttsTool/ttsVoicesDir configure the "Create from text"
-// sound generator — see internal/tts's package doc.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath), ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir}
+// sound generator — see internal/tts's package doc. skywarnDir is where
+// an operator-installed copy of SkywarnPlus lives — see
+// internal/skywarnplus's package doc.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath), ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir}
 	s.live = newLiveHub(s)
 	store.SetChangeHook(func(string) { s.restartNeeded.Store(true) })
 
@@ -188,6 +196,10 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/automation/connections/{macronum}/delete", s.requireAuth(s.handleNodeAutomationConnectionDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/sounds", s.requireAuth(s.handleNodeAutomationSoundSave))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/sounds/{id}/delete", s.requireAuth(s.handleNodeAutomationSoundDelete))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/toggle", s.requireAuth(s.handleNodeSkywarnToggle))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/counties", s.requireAuth(s.handleNodeSkywarnAddCounty))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/counties/{code}/delete", s.requireAuth(s.handleNodeSkywarnDeleteCounty))
+	s.mux.HandleFunc("POST /nodes/{number}/automation/skywarn/register", s.requireAuth(s.handleNodeSkywarnRegister))
 	s.mux.HandleFunc("POST /nodes/{number}/delete", s.requireAuth(s.handleNodeDelete))
 
 	s.mux.HandleFunc("GET /config", s.requireAuth(s.handleConfigIndex))

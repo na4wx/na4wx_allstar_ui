@@ -37,6 +37,7 @@ func main() {
 	soundSchedulePath := flag.String("sound-schedule-file", "/etc/hamvoip-gui/sound-schedule.json", "path to store the \"Automation\" tab's scheduled sound-playback entries — these aren't an Asterisk-native mechanism (unlike scheduled connect/disconnect, which lives in rpt.conf itself), so this app tracks them here and fires them itself")
 	ttsTool := flag.String("tts-tool", "piper", "path to the Piper text-to-speech binary, or bare name if it's on PATH (used by the \"Create from text\" sound generator); install.sh sets this up automatically, see internal/tts's package doc for exactly what it installs and why")
 	ttsVoicesDir := flag.String("tts-voices-dir", "/etc/hamvoip-gui/piper-voices", "directory holding downloaded Piper voice models (.onnx files); install.sh downloads one default voice here automatically, more are available at https://huggingface.co/rhasspy/piper-voices — empty until at least one is downloaded")
+	skywarnDir := flag.String("skywarn-dir", "/usr/local/bin/SkywarnPlus", "directory holding an operator-installed copy of SkywarnPlus (https://github.com/Mason10198/SkywarnPlus), a third-party weather-alert tool; install.sh sets this up as an opt-in step, this app only ever configures a copy that's already there")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -61,7 +62,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir, *skywarnDir)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

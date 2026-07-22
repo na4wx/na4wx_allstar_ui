@@ -219,6 +219,86 @@ if [ -n "$PIPER_ARCH" ]; then
 	fi
 fi
 
+# --- SkywarnPlus (optional weather-alert automation) ------------------------
+#
+# A third-party, no-longer-maintained tool
+# (https://github.com/Mason10198/SkywarnPlus) that announces National
+# Weather Service alerts over the repeater. Unlike everything else this
+# script sets up, this is entirely optional — not everyone wants it — so
+# it's the one thing here that asks first rather than just doing it.
+#
+# Installing it from here (rather than a button in the running web app)
+# matches its own upstream installer's own shape: the real swp-install is
+# heavily interactive (several prompts, an offer to open config.yaml in
+# nano) and was never meant to be triggered from a web server's HTTP
+# handler. What's below reimplements only the non-interactive parts it
+# actually needs (dependencies, download, cron); the app's own Automation
+# tab configures whatever this installs (county codes, which node
+# announces, feature on/off toggles) via deploy/sky_configure.py and
+# SkywarnPlus's own SkyControl.py — see internal/skywarnplus's package doc.
+
+SKYWARN_DIR="/usr/local/bin/SkywarnPlus"
+SKYWARN_RELEASE_VERSION="v0.8.1"
+
+if [ -x "$SKYWARN_DIR/SkywarnPlus.py" ]; then
+	log "SkywarnPlus already installed at $SKYWARN_DIR"
+elif [ ! -t 0 ]; then
+	# No terminal attached (this script run non-interactively somehow) --
+	# can't prompt, so skip rather than silently install something optional.
+	log "Skipping SkywarnPlus prompt (no interactive terminal attached)"
+else
+	echo
+	read -r -p "Install SkywarnPlus weather-alert automation? [y/N] " SKYWARN_ANSWER
+	case "$SKYWARN_ANSWER" in
+		[yY]|[yY][eE][sS])
+			log "Installing SkywarnPlus dependencies"
+			pacman_install ffmpeg unzip
+
+			# HamVoIP's own Python is documented by SkywarnPlus's own README
+			# as "very outdated" -- its own instructions bootstrap pip via
+			# Python 3.5's get-pip.py and pin an old ruamel.yaml for it. Try
+			# a normal pip3 install first in case your image differs, fall
+			# back to that exact documented bootstrap if not.
+			if command -v pip3 >/dev/null 2>&1 && pip3 install --quiet requests python-dateutil pydub ruamel.yaml >/dev/null 2>&1; then
+				log "Installed Python dependencies via pip3"
+			else
+				log "Modern pip install didn't work -- bootstrapping pip for HamVoIP's Python (per SkywarnPlus's own README)"
+				TMP=$(mktemp -d)
+				if curl -fsSL -o "$TMP/get-pip.py" "https://bootstrap.pypa.io/pip/3.5/get-pip.py" && python3 "$TMP/get-pip.py"; then
+					pip3 install requests python-dateutil pydub
+					pip3 install ruamel.yaml==0.15.100
+					log "Installed Python dependencies via bootstrapped pip"
+				else
+					log "warning: couldn't set up Python dependencies for SkywarnPlus -- install requests/python-dateutil/pydub/ruamel.yaml manually, see https://github.com/Mason10198/SkywarnPlus#installation"
+				fi
+				rm -rf "$TMP"
+			fi
+
+			log "Downloading SkywarnPlus $SKYWARN_RELEASE_VERSION"
+			TMP=$(mktemp -d)
+			if curl -fsSL -o "$TMP/SkywarnPlus.zip" "https://github.com/Mason10198/SkywarnPlus/releases/download/$SKYWARN_RELEASE_VERSION/SkywarnPlus.zip"; then
+				rm -rf "$SKYWARN_DIR"
+				unzip -q "$TMP/SkywarnPlus.zip" -d "$(dirname "$SKYWARN_DIR")"
+				chmod +x "$SKYWARN_DIR"/*.py
+
+				cp "$REPO_ROOT/deploy/sky_configure.py" "$SKYWARN_DIR/"
+				chmod +x "$SKYWARN_DIR/sky_configure.py"
+
+				PYTHON3_BIN=$(command -v python3 || echo /usr/bin/python3)
+				echo "* * * * * root $PYTHON3_BIN $SKYWARN_DIR/SkywarnPlus.py" > /etc/cron.d/SkywarnPlus
+				log "Installed SkywarnPlus to $SKYWARN_DIR, scheduled via /etc/cron.d/SkywarnPlus (every 60s)"
+				log "Finish setup on the node's Automation tab: pick your county codes and register this node."
+			else
+				log "warning: couldn't download SkywarnPlus (offline?) -- re-run this script with network access to finish installing it."
+			fi
+			rm -rf "$TMP"
+			;;
+		*)
+			log "Skipping SkywarnPlus"
+			;;
+	esac
+fi
+
 # --- pull latest ---------------------------------------------------------
 
 log "Fetching latest from git"

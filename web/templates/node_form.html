@@ -34,6 +34,9 @@
 <datalist id="ct_keys">
   {{range .CTKeys}}<option value="{{.}}">{{.}}</option>{{end}}
 </datalist>
+<datalist id="county_codes">
+  {{range .CountyCodeOptions}}<option value="{{.Code}}">{{.Label}}</option>{{end}}
+</datalist>
 
 <div class="tabs" data-node-number="{{.Node.Number}}">
   <button type="button" data-tab-target="setup">Setup</button>
@@ -884,6 +887,102 @@
       <button type="submit" class="primary">Add scheduled sound</button>
     </div>
   </form>
+</div>
+
+<div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Weather Alerts (SkywarnPlus)</h2>
+    {{template "help" "Announces National Weather Service alerts for chosen counties over this node. A third-party, no-longer-maintained tool (github.com/Mason10198/SkywarnPlus) — installed as an opt-in step by this app's install.sh, not from here."}}
+  </div>
+  {{if not .SkywarnInstalled}}
+  <p class="hint">Not installed. Re-run this app's <code>install.sh</code> on the Pi and choose to install SkywarnPlus, then reload this page.</p>
+  {{else}}
+  <form method="post" action="/nodes/{{.Node.Number}}/automation/skywarn/toggle">
+    <div class="row">
+      <div class="field">
+        <label for="skywarn_enable">Weather alerts</label>
+        <select id="skywarn_enable" name="enable">
+          <option value="true" {{if .SkywarnStatus.Enable}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.Enable}}selected{{end}}>Off</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="skywarn_sayalert">Announce new alerts</label>
+        <select id="skywarn_sayalert" name="sayalert">
+          <option value="true" {{if .SkywarnStatus.SayAlert}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.SayAlert}}selected{{end}}>Off</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="skywarn_sayallclear">Announce all-clear</label>
+        <select id="skywarn_sayallclear" name="sayallclear">
+          <option value="true" {{if .SkywarnStatus.SayAllClear}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.SayAllClear}}selected{{end}}>Off</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="label-row">
+          <label for="skywarn_tailmessage">Tail message reminder</label>
+          {{template "help" "Periodically repeats active alerts in the courtesy tail message played between transmissions."}}
+        </div>
+        <select id="skywarn_tailmessage" name="tailmessage">
+          <option value="true" {{if .SkywarnStatus.Tailmessage}}selected{{end}}>On</option>
+          <option value="false" {{if not .SkywarnStatus.Tailmessage}}selected{{end}}>Off</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save weather alert settings</button>
+    </div>
+  </form>
+
+  {{if .SkywarnNodeRegistered}}
+  <p class="hint" style="margin-top:1rem">This node ({{.Node.Number}}) is registered to receive weather alert announcements.</p>
+  {{else}}
+  <form method="post" action="/nodes/{{.Node.Number}}/automation/skywarn/register" style="margin-top:1rem">
+    <p class="hint">This node ({{.Node.Number}}) isn't registered with SkywarnPlus yet — it won't announce alerts here until you add it.</p>
+    <div class="actions">
+      <button type="submit" class="primary">Add this node</button>
+    </div>
+  </form>
+  {{end}}
+
+  <h2 style="margin-top:1.25rem">County codes</h2>
+  {{if .SkywarnStatus.CountyCodes}}
+  <table>
+    <thead><tr><th>Code</th><th></th></tr></thead>
+    <tbody>
+      {{range .SkywarnStatus.CountyCodes}}
+      <tr>
+        <td>{{.}}</td>
+        <td>
+          <form method="post" action="/nodes/{{$.Node.Number}}/automation/skywarn/counties/{{.}}/delete" style="display:inline" data-confirm="Remove county {{.}} from weather alerts?" data-confirm-danger>
+            <button type="submit" class="danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="hint">No county codes configured yet — alerts won't fire for anywhere until you add at least one.</p>
+  {{end}}
+
+  <form method="post" action="/nodes/{{.Node.Number}}/automation/skywarn/counties" style="margin-top:1rem">
+    <div class="field">
+      <div class="label-row">
+        <label for="skywarn_county">Add a county</label>
+        {{template "help" "Search by county name or state — find yours at alerts.weather.gov if you're not sure."}}
+      </div>
+      <input type="text" id="skywarn_county" name="code" list="county_codes" placeholder="e.g. Saline, AR (ARC125)" required>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Add county</button>
+    </div>
+  </form>
+
+  <p class="hint" style="margin-top:1rem">Advanced features (AlertScript, Pushover, SkyDescribe, courtesy-tone/ID swap during alerts) aren't managed here — see the <a href="https://github.com/Mason10198/SkywarnPlus">upstream documentation</a> and edit its config.yaml directly for those.</p>
+  {{end}}
 </div>
 </div>
 {{end}}

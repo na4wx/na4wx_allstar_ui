@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	"hamvoipconfiggui/internal/config"
-	"hamvoipconfiggui/internal/soundschedule"
+	"hamvoipconfiggui/internal/skywarnplus"
 	"hamvoipconfiggui/internal/sounds"
+	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/system"
 	"hamvoipconfiggui/internal/tts"
 )
@@ -119,6 +120,15 @@ type nodeFormData struct {
 	SchedulerSect         string
 	AutomationConnections []automationRow
 	SoundSchedules        []soundschedule.Entry
+
+	// Weather Alerts (SkywarnPlus): configuration for an operator-installed
+	// copy — see internal/skywarnplus's package doc. SkywarnInstalled is
+	// false whenever install.sh's opt-in step hasn't been run (or hasn't
+	// finished), in which case the other Skywarn* fields are left zeroed.
+	SkywarnInstalled      bool
+	SkywarnStatus         skywarnplus.Status
+	SkywarnNodeRegistered bool // whether this node's own number is already in SkywarnStatus.Nodes
+	CountyCodeOptions     []skywarnplus.CountyOption
 }
 
 // radioChannelOption is one entry in the RX/TX channel dropdown: a
@@ -229,6 +239,7 @@ func (s *Server) renderNodeEditPageWithNode(w http.ResponseWriter, r *http.Reque
 	s.populateNodeTelemetry(&data)
 	s.populateNodeAutomation(&data)
 	s.populateNodeSoundSchedule(&data)
+	s.populateNodeSkywarn(r.Context(), &data)
 	s.render(w, "node_form.html", data)
 }
 
@@ -327,6 +338,7 @@ func (s *Server) handleNodeSave(w http.ResponseWriter, r *http.Request) {
 		s.populateNodeTelemetry(&data)
 		s.populateNodeAutomation(&data)
 		s.populateNodeSoundSchedule(&data)
+		s.populateNodeSkywarn(r.Context(), &data)
 		s.render(w, "node_form.html", data)
 		return
 	}
