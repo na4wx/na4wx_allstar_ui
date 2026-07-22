@@ -218,3 +218,84 @@ func TestDeleteCustomMissingIsError(t *testing.T) {
 		t.Error("DeleteCustom() error = nil, want an error for a nonexistent sound")
 	}
 }
+
+func TestSoxInputArgs(t *testing.T) {
+	if _, ok := soxInputArgs(".wav"); !ok {
+		t.Error(".wav should be supported")
+	}
+	args, ok := soxInputArgs(".ulaw")
+	if !ok || len(args) == 0 {
+		t.Errorf(".ulaw should be supported with raw-format args, got %v, %v", args, ok)
+	}
+	if _, ok := soxInputArgs(".g722"); ok {
+		t.Error(".g722 should not be offered for preview (unverified on-disk framing)")
+	}
+}
+
+// fakeSoxStreaming writes a shell script standing in for sox's Preview
+// invocation, which streams to stdout rather than touching a fixed
+// destination path (unlike Upload's fakeSox above) — always writes
+// wavData to stdout and message to stderr, exiting with exitOK's code.
+func fakeSoxStreaming(t *testing.T, exitOK bool, wavData, message string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fake-sox-stream")
+	exit := "0"
+	if !exitOK {
+		exit = "1"
+	}
+	script := "#!/bin/sh\necho '" + message + "' >&2\nif [ \"" + exit + "\" = \"0\" ]; then printf '" + wavData + "'; fi\nexit " + exit + "\n"
+	if err := os.WriteFile(path, []byte(script), 0755); err != nil {
+		t.Fatalf("write fake sox: %v", err)
+	}
+	return path
+}
+
+func TestPreviewSuccess(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "myid.ulaw")
+	s := New(dir, t.TempDir(), fakeSoxStreaming(t, true, "fake wav bytes", "sox: ok"))
+	wav, err := s.Preview(context.Background(), "myid")
+	if err != nil {
+		t.Fatalf("Preview() error = %v", err)
+	}
+	if string(wav) != "fake wav bytes" {
+		t.Errorf("wav = %q", wav)
+	}
+}
+
+func TestPreviewUnknownName(t *testing.T) {
+	s := New(t.TempDir(), t.TempDir(), "sox")
+	if _, err := s.Preview(context.Background(), "nope"); err == nil {
+		t.Fatal("Preview() error = nil, want an error for a nonexistent sound")
+	}
+}
+
+func TestPreviewInvalidName(t *testing.T) {
+	s := New(t.TempDir(), t.TempDir(), "sox")
+	if _, err := s.Preview(context.Background(), "../etc/passwd"); err == nil {
+		t.Fatal("Preview() error = nil, want rejection of a path-traversal name")
+	}
+}
+
+func TestPreviewUnsupportedFormat(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "myid.g722")
+	s := New(dir, t.TempDir(), "sox")
+	if _, err := s.Preview(context.Background(), "myid"); err == nil {
+		t.Fatal("Preview() error = nil, want rejection of an unsupported format")
+	}
+}
+
+func TestPreviewSoxFailure(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "myid.ulaw")
+	s := New(dir, t.TempDir(), fakeSoxStreaming(t, false, "", "sox: decode error"))
+	_, err := s.Preview(context.Background(), "myid")
+	if err == nil {
+		t.Fatal("Preview() error = nil, want an error when sox exits non-zero")
+	}
+	if !strings.Contains(err.Error(), "fake-sox-stream") {
+		t.Errorf("error = %v, want it to name the tool", err)
+	}
+}

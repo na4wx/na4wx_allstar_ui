@@ -384,6 +384,71 @@ func (s *Server) handleNodeSoundTTS(w http.ResponseWriter, r *http.Request) {
 	s.renderNodeEditPage(w, r, number, flash("ok", "Generated \""+name+"\" from text — pick it from any sound field below."))
 }
 
+// handleNodeSoundTTSPreview synthesizes speech for the submitted
+// voice+text and returns it directly as WAV bytes — no sox transcoding,
+// no save. Piper's own WAV output is already linear-PCM and
+// browser-playable as-is, so unlike the save path (which needs sox's
+// 8kHz mono mu-law for app_rpt) this can return exactly what Piper
+// produced. Called from the "Preview" button via fetch(), not a normal
+// form submission, so errors go back as a plain text body/status code
+// for the page's own JS to show, not a flash + full page re-render.
+func (s *Server) handleNodeSoundTTSPreview(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	text := strings.TrimSpace(r.FormValue("tts_text"))
+	if text == "" {
+		http.Error(w, "Enter the text to speak", http.StatusBadRequest)
+		return
+	}
+	voice, ok, err := tts.FindVoice(s.ttsVoicesDir, r.FormValue("tts_voice"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		http.Error(w, "Pick a voice — none selected, or it's no longer available", http.StatusBadRequest)
+		return
+	}
+	wav, output, err := tts.Synthesize(r.Context(), s.ttsTool, voice.ModelPath, text)
+	if err != nil {
+		msg := err.Error()
+		if output != "" {
+			msg += " — " + output
+		}
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "audio/wav")
+	w.Write(wav)
+}
+
+// handleNodeSoundAudio streams one of the operator's own custom sounds,
+// transcoded on the fly to browser-playable WAV (see
+// sounds.Store.Preview), for the "Play" button next to each row in the
+// Custom sound files table. Never reachable for a stock library file —
+// same boundary as handleNodeSoundDelete.
+func (s *Server) handleNodeSoundAudio(w http.ResponseWriter, r *http.Request) {
+	number := r.PathValue("number")
+	if _, err := s.store.LoadNode(number); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	wav, err := s.sounds.Preview(r.Context(), r.PathValue("name"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "audio/wav")
+	w.Write(wav)
+}
+
 // handleNodeSoundDelete removes one of the operator's own custom sound
 // files. Never reachable for a stock library file — see
 // sounds.Store.DeleteCustom, which only ever touches the custom

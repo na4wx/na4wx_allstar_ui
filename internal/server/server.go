@@ -181,6 +181,8 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /nodes/{number}/courtesy-tones", s.requireAuth(s.handleNodeCourtesyToneSave))
 	s.mux.HandleFunc("POST /nodes/{number}/sounds/upload", s.requireAuth(s.handleNodeSoundUpload))
 	s.mux.HandleFunc("POST /nodes/{number}/sounds/tts", s.requireAuth(s.handleNodeSoundTTS))
+	s.mux.HandleFunc("POST /nodes/{number}/sounds/tts/preview", s.requireAuth(s.handleNodeSoundTTSPreview))
+	s.mux.HandleFunc("GET /nodes/{number}/sounds/{name}/audio", s.requireAuth(s.handleNodeSoundAudio))
 	s.mux.HandleFunc("POST /nodes/{number}/sounds/{name}/delete", s.requireAuth(s.handleNodeSoundDelete))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/connections", s.requireAuth(s.handleNodeAutomationConnectionSave))
 	s.mux.HandleFunc("POST /nodes/{number}/automation/connections/{macronum}/delete", s.requireAuth(s.handleNodeAutomationConnectionDelete))

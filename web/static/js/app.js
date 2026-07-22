@@ -458,3 +458,78 @@ const confirmModal = (function () {
     });
   });
 })();
+
+// "Play" buttons next to each Custom sound files row. One shared Audio
+// element for the whole page (not one per row) so starting a second
+// clip always stops whichever one was already playing, and clicking the
+// same row's button again toggles it off rather than restarting it.
+(function () {
+  const buttons = document.querySelectorAll("[data-play-sound]");
+  if (!buttons.length) return;
+  const audio = new Audio();
+  let activeBtn = null;
+
+  function stop() {
+    audio.pause();
+    audio.currentTime = 0;
+    if (activeBtn) activeBtn.textContent = "Play";
+    activeBtn = null;
+  }
+  audio.addEventListener("ended", stop);
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const wasActive = activeBtn === btn;
+      stop();
+      if (wasActive) return; // this click was the toggle-off
+      audio.src = btn.getAttribute("data-play-sound");
+      audio.play();
+      btn.textContent = "Stop";
+      activeBtn = btn;
+    });
+  });
+})();
+
+// "Preview" button on the "Create from text" card: synthesizes speech
+// for whatever voice/text is currently filled in and plays it
+// immediately, via fetch rather than a normal form submission — a full
+// page reload just to hear a few seconds of audio (and losing whatever
+// else was mid-edit on the page) would be a bad way to let someone try
+// a few wordings/voices before committing to "Generate & save".
+(function () {
+  const btn = document.querySelector("[data-tts-preview]");
+  if (!btn) return;
+  const voiceField = document.getElementById("tts_voice");
+  const textField = document.getElementById("tts_text");
+  const status = document.querySelector("[data-tts-preview-status]");
+  const audio = new Audio();
+
+  btn.addEventListener("click", async () => {
+    const text = textField.value.trim();
+    if (!text) {
+      textField.focus();
+      return;
+    }
+    audio.pause();
+    btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.textContent = "Generating…";
+    if (status) status.textContent = "";
+    try {
+      const body = new URLSearchParams({ tts_voice: voiceField.value, tts_text: text });
+      const resp = await fetch(btn.getAttribute("data-tts-preview"), { method: "POST", body });
+      if (!resp.ok) {
+        if (status) status.textContent = await resp.text();
+        return;
+      }
+      const blob = await resp.blob();
+      audio.src = URL.createObjectURL(blob);
+      audio.play();
+    } catch (err) {
+      if (status) status.textContent = "Couldn't reach the server to generate a preview.";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+})();

@@ -261,3 +261,87 @@ func (s *Store) DeleteCustom(name string) error {
 	}
 	return nil
 }
+
+// soxInputArgs returns the sox arguments (placed before the input path)
+// needed to correctly read a sound file of the given extension. Raw/
+// headerless formats (everything except .wav) have no way to describe
+// their own sample rate or encoding, so sox can't sniff them the way it
+// can a WAV file — these values match Asterisk's own fixed convention
+// for telephony audio (8kHz mono), the same assumption Upload's own
+// output side already relies on. ok is false for a format this app
+// doesn't know how to safely read for preview (currently just .g722,
+// whose on-disk framing this app hasn't had a real sample to verify
+// against — rather than guess and risk a garbled preview, previewing it
+// is simply not offered).
+func soxInputArgs(ext string) (args []string, ok bool) {
+	switch ext {
+	case ".wav":
+		return nil, true // self-describing, no flags needed
+	case ".gsm":
+		return nil, true // GSM 06.10 is inherently 8kHz mono; sox infers this from -t gsm alone
+	case ".ulaw", ".ul":
+		return []string{"-r", "8000", "-c", "1", "-t", "ul"}, true
+	case ".alaw", ".al":
+		return []string{"-r", "8000", "-c", "1", "-t", "al"}, true
+	case ".pcm", ".sln":
+		return []string{"-r", "8000", "-c", "1", "-t", "sw"}, true // raw 16-bit signed PCM
+	default:
+		return nil, false
+	}
+}
+
+// previewInfo resolves name to its actual file in the custom directory
+// (whichever recognized extension it's actually stored as) and the sox
+// input args needed to read it. Never touches the stock library — a
+// preview is only ever offered for the operator's own uploaded/generated
+// sounds.
+func (s *Store) previewInfo(name string) (path string, soxArgs []string, err error) {
+	if !ValidName(name) {
+		return "", nil, fmt.Errorf("invalid sound name")
+	}
+	entries, err := os.ReadDir(s.customDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil, fmt.Errorf("sound %q not found", name)
+		}
+		return "", nil, err
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(e.Name()))
+		if strings.TrimSuffix(e.Name(), filepath.Ext(e.Name())) != name {
+			continue
+		}
+		args, ok := soxInputArgs(ext)
+		if !ok {
+			return "", nil, fmt.Errorf("previewing %s files isn't supported", ext)
+		}
+		return filepath.Join(s.customDir, e.Name()), args, nil
+	}
+	return "", nil, fmt.Errorf("sound %q not found", name)
+}
+
+// Preview transcodes name (one of the operator's own custom sounds) to
+// browser-playable WAV audio on the fly, so it can be heard in-browser
+// without storing an extra converted copy alongside the original. Same
+// "trust the tool's own exit code" discipline as Upload.
+func (s *Store) Preview(ctx context.Context, name string) ([]byte, error) {
+	path, args, err := s.previewInfo(name)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, path, "-t", "wav", "-")
+
+	ctx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, s.soxTool, args...)
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%s: %w: %s", s.soxTool, err, stderr.String())
+	}
+	return out.Bytes(), nil
+}

@@ -367,12 +367,15 @@
   {{range .SoundFiles}}{{if .Custom}}{{$anyCustom = true}}{{end}}{{end}}
   {{if $anyCustom}}
   <table>
-    <thead><tr><th>Name</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th></th><th></th></tr></thead>
     <tbody>
       {{range .SoundFiles}}
       {{if .Custom}}
       <tr>
         <td>{{.Name}}</td>
+        <td>
+          <button type="button" data-play-sound="/nodes/{{$.Node.Number}}/sounds/{{.Name}}/audio">Play</button>
+        </td>
         <td>
           <form method="post" action="/nodes/{{$.Node.Number}}/sounds/{{.Name}}/delete" style="display:inline" data-confirm="Delete sound file {{.Name}}? Any field currently referencing it will stop working until you pick a replacement." data-confirm-danger>
             <button type="submit" class="danger">Delete</button>
@@ -436,7 +439,9 @@
       <textarea id="tts_text" name="tts_text" rows="3" placeholder="The Tuesday night net starts at 8 PM." required></textarea>
     </div>
     <div class="actions">
+      <button type="button" data-tts-preview="/nodes/{{.Node.Number}}/sounds/tts/preview">Preview</button>
       <button type="submit" class="primary">Generate &amp; save</button>
+      <span class="hint" data-tts-preview-status></span>
     </div>
   </form>
   {{else}}
