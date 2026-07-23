@@ -52,6 +52,7 @@ func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
 		"sounds.listAll": true,
 		"sounds.upload":  true,
 		"sounds.delete":  true,
+		"sounds.preview": true,
 
 		"rawconfig.listFiles":  true,
 		"rawconfig.getFile":    true,

@@ -56,3 +56,25 @@ func (a *Agent) actionSoundsDelete(_ context.Context, params json.RawMessage) (a
 	}
 	return map[string]bool{"ok": true}, nil
 }
+
+type soundsPreviewParams struct {
+	Name string `json:"name"`
+}
+
+// actionSoundsPreview wraps sounds.Store.Preview -- returns one of the
+// operator's own custom sounds transcoded to browser-playable WAV,
+// base64-encoded to match soundsUploadParams's own wire convention. Never
+// reachable for a stock library file; see Preview's own doc comment for
+// why (a preview is only ever offered for the operator's own uploaded/
+// generated sounds).
+func (a *Agent) actionSoundsPreview(ctx context.Context, params json.RawMessage) (any, error) {
+	var p soundsPreviewParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, fmt.Errorf("bad params: %w", err)
+	}
+	wav, err := a.sounds.Preview(ctx, p.Name)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{"dataBase64": base64.StdEncoding.EncodeToString(wav)}, nil
+}

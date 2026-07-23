@@ -23,6 +23,13 @@ func (a *Agent) runOnce(ctx context.Context, settings Settings) (helloSucceeded 
 		logf("dial %s: %v", settings.CloudURL, err)
 		return false
 	}
+	// coder/websocket defaults to a 32KiB read limit -- far too small for
+	// anything but a very short relayed audio clip (sounds.upload's
+	// inbound base64 params, in particular). A message over the limit
+	// doesn't degrade gracefully; the read fails and the whole connection
+	// is torn down. 16MiB comfortably covers any single sound file this
+	// app expects to relay.
+	conn.SetReadLimit(maxRelayMessageBytes)
 	// Registered even before the hello handshake completes, so Reload's
 	// local kill switch (see its doc comment) can cut the connection at
 	// any point, not just once fully established.

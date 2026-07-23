@@ -50,6 +50,7 @@ func (a *Agent) actions() map[string]actionFunc {
 		"sounds.listAll": a.actionSoundsListAll,
 		"sounds.upload":  a.actionSoundsUpload,
 		"sounds.delete":  a.actionSoundsDelete,
+		"sounds.preview": a.actionSoundsPreview,
 
 		"rawconfig.listFiles":  a.actionRawConfigListFiles,
 		"rawconfig.getFile":    a.actionRawConfigGetFile,

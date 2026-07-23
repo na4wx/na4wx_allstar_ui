@@ -1,7 +1,10 @@
 package cloudagent
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +15,7 @@ import (
 	"github.com/coder/websocket/wsjson"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/sounds"
 )
 
 // startFakeCloud runs handler against every WebSocket connection to a
@@ -190,6 +194,69 @@ func TestRunOnceHandlesRelayedCall(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("did not receive a result for the relayed call")
+	}
+}
+
+// TestRunOnceHandlesLargeRelayedParams is the regression test for
+// runOnce's conn.SetReadLimit call: coder/websocket defaults to a 32KiB
+// per-message read limit, which a real sounds.upload call (base64-
+// inflated audio bytes) blows past easily -- a message over the limit
+// used to fail the read and tear down the whole connection instead of
+// just failing that one call. This sends a >32KB "call" envelope and
+// confirms a correlated "result" still comes back rather than the
+// connection dying.
+func TestRunOnceHandlesLargeRelayedParams(t *testing.T) {
+	// newSoundsTestAgent's store is nil (fine for dispatching sounds.*
+	// actions directly), but runOnce itself calls a.store.ListNodes()
+	// unconditionally as part of hello -- needs a real Store here.
+	customDir, stockDir := t.TempDir(), t.TempDir()
+	soundsStore := sounds.New(customDir, stockDir, fakeSoxTool(t))
+	a := New(t.TempDir()+"/settings.json", "", config.NewStore(t.TempDir()), "asterisk", soundsStore, nil, nil, "", "818-prog", "", "")
+
+	largeData := bytes.Repeat([]byte("x"), 40*1024) // 40KB raw -> well over 32KB once base64-inflated and wrapped in JSON
+	params, err := json.Marshal(map[string]string{
+		"name":       "big-test",
+		"dataBase64": base64.StdEncoding.EncodeToString(largeData),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := make(chan envelope, 1)
+	url := startFakeCloud(t, func(ctx context.Context, conn *websocket.Conn) {
+		var hello envelope
+		if err := wsjson.Read(ctx, conn, &hello); err != nil {
+			return
+		}
+		if err := wsjson.Write(ctx, conn, envelope{Type: typeHelloAck, OK: true}); err != nil {
+			return
+		}
+		if err := wsjson.Write(ctx, conn, envelope{Type: typeCall, ID: "call-1", Action: "sounds.upload", Params: params}); err != nil {
+			return
+		}
+		for {
+			var msg envelope
+			if err := wsjson.Read(ctx, conn, &msg); err != nil {
+				return
+			}
+			if msg.Type == typeResult && msg.ID == "call-1" {
+				results <- msg
+				return
+			}
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go a.runOnce(ctx, Settings{CloudURL: url, APIKey: "test-key", Enabled: true})
+
+	select {
+	case res := <-results:
+		if !res.OK || res.Error != "" {
+			t.Errorf("result = %+v, want ok=true and no error (a >32KB message must not kill the connection)", res)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive a result for the large relayed call -- the connection likely died reading it")
 	}
 }
 

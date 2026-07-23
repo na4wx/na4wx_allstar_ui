@@ -63,6 +63,11 @@ const (
 	// small, since it's now traffic over someone's home uplink for
 	// every connected device, all the time.
 	heartbeatInterval = 20 * time.Second
+
+	// maxRelayMessageBytes overrides coder/websocket's default 32KiB
+	// per-message read limit — see runOnce's own comment on
+	// conn.SetReadLimit for why that default is far too small.
+	maxRelayMessageBytes = 16 * 1024 * 1024
 )
 
 // Agent holds this node's cloud connection state and the internal/*
