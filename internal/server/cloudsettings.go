@@ -23,6 +23,8 @@ func (s *Server) populateSystemCloud(data *systemPageData) {
 	data.CloudURL = settings.CloudURL
 	data.CloudAPIKey = settings.APIKey
 	data.CloudEnabled = settings.Enabled
+	data.CloudAllowRemoteReboot = settings.AllowRemoteReboot
+	data.CloudAllowRawConfigEdit = settings.AllowRawConfigEdit
 }
 
 // handleSystemCloudSave saves the Cloud Sync card in one submission —
@@ -40,9 +42,11 @@ func (s *Server) handleSystemCloudSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	settings := cloudagent.Settings{
-		CloudURL: strings.TrimSpace(r.FormValue("cloud_url")),
-		APIKey:   strings.TrimSpace(r.FormValue("cloud_api_key")),
-		Enabled:  r.FormValue("cloud_enabled") == "true",
+		CloudURL:           strings.TrimSpace(r.FormValue("cloud_url")),
+		APIKey:             strings.TrimSpace(r.FormValue("cloud_api_key")),
+		Enabled:            r.FormValue("cloud_enabled") == "true",
+		AllowRemoteReboot:  r.FormValue("cloud_allow_remote_reboot") == "true",
+		AllowRawConfigEdit: r.FormValue("cloud_allow_raw_config_edit") == "true",
 	}
 	if settings.Enabled && (settings.CloudURL == "" || settings.APIKey == "") {
 		s.renderSystemPage(w, r, flash("error", "Enter both a cloud URL and an API key before enabling Cloud Sync"))

@@ -18,6 +18,18 @@ type Settings struct {
 	CloudURL string `json:"cloud_url"`
 	APIKey   string `json:"api_key"`
 	Enabled  bool   `json:"enabled"`
+
+	// AllowRemoteReboot/AllowRawConfigEdit gate the most destructive
+	// relayed actions behind their own, separate opt-in — off by
+	// default even once Cloud Sync itself is enabled. Pasting an API
+	// key shouldn't silently expose "reboot this device" or "rewrite an
+	// arbitrary config file" — same explicit, narrow opt-in philosophy
+	// this app already uses for SkywarnPlus (only ever configured if
+	// already installed), applied here to capability rather than
+	// presence. See actions_system.go/actions_rawconfig.go for where
+	// these are actually checked.
+	AllowRemoteReboot  bool `json:"allow_remote_reboot"`
+	AllowRawConfigEdit bool `json:"allow_raw_config_edit"`
 }
 
 // SettingsStore persists Settings as a single JSON file at path, the

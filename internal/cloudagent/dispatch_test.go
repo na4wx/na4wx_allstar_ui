@@ -22,11 +22,13 @@ func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
 	got := a.actions()
 
 	want := map[string]bool{
-		"system.status":     true,
-		"config.listNodes":  true,
-		"config.loadNode":   true,
-		"config.saveNode":   true,
-		"config.deleteNode": true,
+		"system.status":          true,
+		"system.restartAsterisk": true,
+		"system.reboot":          true,
+		"config.listNodes":       true,
+		"config.loadNode":        true,
+		"config.saveNode":        true,
+		"config.deleteNode":      true,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("actions() has %d entries, want %d: %v", len(got), len(want), keysOf(got))

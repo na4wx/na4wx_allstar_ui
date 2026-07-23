@@ -41,10 +41,14 @@ type systemPageData struct {
 
 	// Cloud Sync: this node's optional, off-by-default connection to the
 	// public cloud platform — see internal/cloudagent's package doc and
-	// populateSystemCloud.
-	CloudURL     string
-	CloudAPIKey  string
-	CloudEnabled bool
+	// populateSystemCloud. CloudAllowRemoteReboot/CloudAllowRawConfigEdit
+	// are further, separately opted-in capability gates on top of
+	// CloudEnabled — see cloudagent.Settings's own doc comment for why.
+	CloudURL                string
+	CloudAPIKey             string
+	CloudEnabled            bool
+	CloudAllowRemoteReboot  bool
+	CloudAllowRawConfigEdit bool
 
 	// EmptyRadioFiles lists usbradio.conf/simpleusb.conf files with zero
 	// devices defined at all, regardless of whether any node actually
