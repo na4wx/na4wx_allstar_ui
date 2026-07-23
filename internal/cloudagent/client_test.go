@@ -81,6 +81,51 @@ func TestRunOnceHelloAckAndHeartbeat(t *testing.T) {
 	}
 }
 
+// TestRunOnceSetsLastConnected confirms LastConnected -- surfaced on
+// the local Cloud Sync settings card as a liveness signal -- moves from
+// the zero Time to "just now" the moment a hello handshake succeeds,
+// not merely when a connection is dialed.
+func TestRunOnceSetsLastConnected(t *testing.T) {
+	url := startFakeCloud(t, func(ctx context.Context, conn *websocket.Conn) {
+		var hello envelope
+		if err := wsjson.Read(ctx, conn, &hello); err != nil {
+			return
+		}
+		if err := wsjson.Write(ctx, conn, envelope{Type: typeHelloAck, OK: true}); err != nil {
+			return
+		}
+		<-ctx.Done()
+	})
+
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	if !a.LastConnected().IsZero() {
+		t.Fatal("LastConnected() is non-zero before any connection attempt")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	before := time.Now()
+	done := make(chan bool, 1)
+	go func() {
+		done <- a.runOnce(ctx, Settings{CloudURL: url, APIKey: "test-key", Enabled: true})
+	}()
+
+	deadline := time.After(2 * time.Second)
+	for a.LastConnected().IsZero() {
+		select {
+		case <-deadline:
+			t.Fatal("LastConnected() still zero after the hello handshake should have succeeded")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if last := a.LastConnected(); last.Before(before) {
+		t.Errorf("LastConnected() = %v, want a time at or after %v", last, before)
+	}
+
+	cancel()
+	<-done
+}
+
 // TestRunOnceRejectedHelloReturnsFalse confirms a rejected API key
 // reports helloSucceeded=false, which is what Run uses to keep backing
 // off instead of resetting to the initial 1s delay.

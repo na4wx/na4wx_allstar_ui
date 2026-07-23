@@ -312,6 +312,7 @@
     <h2 style="margin:0">Cloud Sync</h2>
     {{template "help" "Optional: connect this node to the public cloud platform so it can be managed remotely, e.g. from another location. This node always dials out to the cloud URL below — it never opens any port for the cloud to reach in, so nothing needs forwarding on your router. Off by default; nothing is sent anywhere until you enable it here with an API key generated on the cloud site."}}
   </div>
+  {{if .CloudEnabled}}<p class="hint">Last connected: {{.CloudLastConnected}}</p>{{end}}
   <form method="post" action="/system/cloud">
     <div class="row">
       <div class="field">

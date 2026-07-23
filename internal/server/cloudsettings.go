@@ -25,6 +25,11 @@ func (s *Server) populateSystemCloud(data *systemPageData) {
 	data.CloudEnabled = settings.Enabled
 	data.CloudAllowRemoteReboot = settings.AllowRemoteReboot
 	data.CloudAllowRawConfigEdit = settings.AllowRawConfigEdit
+	if last := s.cloudAgent.LastConnected(); !last.IsZero() {
+		data.CloudLastConnected = last.Format("Jan 2, 2006 3:04 PM")
+	} else {
+		data.CloudLastConnected = "never"
+	}
 }
 
 // handleSystemCloudSave saves the Cloud Sync card in one submission —

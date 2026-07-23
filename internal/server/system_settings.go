@@ -49,6 +49,7 @@ type systemPageData struct {
 	CloudEnabled            bool
 	CloudAllowRemoteReboot  bool
 	CloudAllowRawConfigEdit bool
+	CloudLastConnected      string
 
 	// EmptyRadioFiles lists usbradio.conf/simpleusb.conf files with zero
 	// devices defined at all, regardless of whether any node actually

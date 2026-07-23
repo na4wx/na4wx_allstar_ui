@@ -77,3 +77,17 @@ func TestPopulateSystemCloudPrefersSavedURLOverDefault(t *testing.T) {
 		t.Errorf("CloudAPIKey = %q, want the saved key", data.CloudAPIKey)
 	}
 }
+
+// TestPopulateSystemCloudLastConnectedNeverConnected covers a fresh
+// process that hasn't completed a hello handshake yet -- the Cloud Sync
+// card's liveness line should read "never", not a zero-value timestamp
+// or an empty string.
+func TestPopulateSystemCloudLastConnectedNeverConnected(t *testing.T) {
+	s := newCloudTestServer(t, "wss://cloud.example.com/agent")
+	var data systemPageData
+	s.populateSystemCloud(&data)
+
+	if data.CloudLastConnected != "never" {
+		t.Errorf("CloudLastConnected = %q, want \"never\"", data.CloudLastConnected)
+	}
+}
