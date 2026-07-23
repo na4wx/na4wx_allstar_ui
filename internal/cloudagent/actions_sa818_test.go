@@ -27,7 +27,7 @@ func fakeSA818Tool(t *testing.T, tail string) string {
 func TestActionSA818ProgramSuccess(t *testing.T) {
 	settingsPath := filepath.Join(t.TempDir(), "settings.json")
 	statePath := filepath.Join(t.TempDir(), "sa818-last.json")
-	a := New(settingsPath, nil, "asterisk", nil, nil, nil, "", fakeSA818Tool(t, "OK"), statePath)
+	a := New(settingsPath, nil, "asterisk", nil, nil, nil, "", fakeSA818Tool(t, "OK"), statePath, "")
 
 	params, _ := json.Marshal(sa818.Settings{TxFreqMHz: "446.1000", RxFreqMHz: "446.1000", Squelch: 5, Volume: 4})
 	result, err := a.dispatch(context.Background(), "sa818.program", params)
@@ -53,7 +53,7 @@ func TestActionSA818ProgramSuccess(t *testing.T) {
 
 func TestActionSA818ProgramModuleRejection(t *testing.T) {
 	a := New(filepath.Join(t.TempDir(), "settings.json"), nil, "asterisk", nil, nil, nil, "",
-		fakeSA818Tool(t, "Error, invalid information"), filepath.Join(t.TempDir(), "sa818-last.json"))
+		fakeSA818Tool(t, "Error, invalid information"), filepath.Join(t.TempDir(), "sa818-last.json"), "")
 
 	params, _ := json.Marshal(sa818.Settings{})
 	result, err := a.dispatch(context.Background(), "sa818.program", params)

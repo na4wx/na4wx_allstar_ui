@@ -22,7 +22,7 @@ func TestActionSkywarnListCountiesWorksWithoutInstall(t *testing.T) {
 }
 
 func TestActionSkywarnGetStatusNotInstalledIsError(t *testing.T) {
-	a := New(t.TempDir()+"/settings.json", nil, "asterisk", nil, nil, nil, t.TempDir(), "818-prog", "")
+	a := New(t.TempDir()+"/settings.json", nil, "asterisk", nil, nil, nil, t.TempDir(), "818-prog", "", "")
 	if _, err := a.dispatch(context.Background(), "skywarn.getStatus", nil); err == nil {
 		t.Fatal("dispatch() error = nil, want an error when SkywarnPlus.py isn't present")
 	}
@@ -58,7 +58,7 @@ func TestActionSkywarnGetStatusInstalled(t *testing.T) {
 		t.Skip("python3 not found on PATH, skipping")
 	}
 	dir := newFakeSkywarnDir(t)
-	a := New(t.TempDir()+"/settings.json", nil, "asterisk", nil, nil, nil, dir, "818-prog", "")
+	a := New(t.TempDir()+"/settings.json", nil, "asterisk", nil, nil, nil, dir, "818-prog", "", "")
 
 	result, err := a.dispatch(context.Background(), "skywarn.getStatus", nil)
 	if err != nil {

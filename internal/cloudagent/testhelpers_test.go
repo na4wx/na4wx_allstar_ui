@@ -28,5 +28,6 @@ func newTestAgent(t *testing.T, settingsPath string, store *config.Store, asteri
 		"", // skywarnDir -- not installed in these tests
 		"818-prog",
 		filepath.Join(t.TempDir(), "sa818-last.json"),
+		"", // auditLogPath -- audit logging disabled in these tests
 	)
 }

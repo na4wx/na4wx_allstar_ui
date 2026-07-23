@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // actionFunc is one relayed action's implementation: decode params,
@@ -60,11 +61,25 @@ func (a *Agent) actions() map[string]actionFunc {
 
 // dispatch looks up action in the registry and runs it, turning an
 // unrecognized name into an error result rather than panicking or
-// silently dropping the call.
+// silently dropping the call. Every attempt — known or unknown action,
+// success or failure — is independently recorded via a.audit (see
+// audit.go), deliberately without the params themselves: several
+// actions carry secrets (an SkywarnPlus Pushover API token, etc.) that
+// have no business sitting in a plaintext log file just for an audit
+// trail that only needs to answer "what was asked of this device, and
+// did it work" — not "with what exact values".
 func (a *Agent) dispatch(ctx context.Context, action string, params json.RawMessage) (any, error) {
 	fn, ok := a.actions()[action]
 	if !ok {
-		return nil, fmt.Errorf("unknown action %q", action)
+		err := fmt.Errorf("unknown action %q", action)
+		a.audit.log(auditEntry{Time: time.Now(), Action: action, OK: false, Error: err.Error()})
+		return nil, err
 	}
-	return fn(ctx, params)
+	result, err := fn(ctx, params)
+	entry := auditEntry{Time: time.Now(), Action: action, OK: err == nil}
+	if err != nil {
+		entry.Error = err.Error()
+	}
+	a.audit.log(entry)
+	return result, err
 }

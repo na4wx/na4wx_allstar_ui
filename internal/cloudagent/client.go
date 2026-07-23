@@ -56,6 +56,9 @@ func (a *Agent) runOnce(ctx context.Context, settings Settings) (helloSucceeded 
 		return false
 	}
 	logf("connected to %s", settings.CloudURL)
+	a.mu.Lock()
+	a.lastConnected = time.Now()
+	a.mu.Unlock()
 
 	heartbeatCtx, stopHeartbeat := context.WithCancel(ctx)
 	defer stopHeartbeat()

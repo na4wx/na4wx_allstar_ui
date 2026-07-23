@@ -141,10 +141,12 @@ func (s *Server) StartCloudAgent(ctx context.Context) {
 // internal/skywarnplus's package doc. wxTonesPath is where the
 // operator's own alert-driven courtesy-tone mappings are persisted —
 // see internal/wxtone's package doc. cloudSettingsPath is where this
-// node's cloud API key/URL/enabled flag are persisted, and cloudURLDefault
-// pre-fills the Cloud Sync settings form the first time it's opened —
-// see internal/cloudagent's package doc.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir, wxTonesPath, cloudSettingsPath, cloudURLDefault string) (*Server, error) {
+// node's cloud API key/URL/enabled flag are persisted, cloudURLDefault
+// pre-fills the Cloud Sync settings form the first time it's opened, and
+// cloudAuditLogPath is where every action relayed through the cloud
+// connection is independently recorded — see internal/cloudagent's
+// package doc.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir, wxTonesPath, cloudSettingsPath, cloudURLDefault, cloudAuditLogPath string) (*Server, error) {
 	// Built once and shared with cloudAgent below, rather than each
 	// layer constructing its own -- both are thin wrappers over the same
 	// on-disk state, so there's no reason for two separate instances.
@@ -152,7 +154,7 @@ func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS
 	soundScheduleStore := soundschedule.New(soundSchedulePath)
 	wxTonesStore := wxtone.New(wxTonesPath)
 
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: soundsStore, soundSchedule: soundScheduleStore, ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir, wxTones: wxTonesStore, cloudAgent: cloudagent.New(cloudSettingsPath, store, asteriskBin, soundsStore, soundScheduleStore, wxTonesStore, skywarnDir, sa818Tool, sa818StatePath), cloudURLDefault: cloudURLDefault}
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: soundsStore, soundSchedule: soundScheduleStore, ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir, wxTones: wxTonesStore, cloudAgent: cloudagent.New(cloudSettingsPath, store, asteriskBin, soundsStore, soundScheduleStore, wxTonesStore, skywarnDir, sa818Tool, sa818StatePath, cloudAuditLogPath), cloudURLDefault: cloudURLDefault}
 	s.live = newLiveHub(s)
 	store.SetChangeHook(func(string) { s.restartNeeded.Store(true) })
 

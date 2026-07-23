@@ -80,17 +80,22 @@ type Agent struct {
 	skywarnDir     string
 	sa818Tool      string
 	sa818StatePath string
+	audit          *auditWriter
 
-	mu         sync.Mutex
-	reload     chan struct{}
-	activeConn *websocket.Conn // set only while runOnce holds an open connection
+	mu            sync.Mutex
+	reload        chan struct{}
+	activeConn    *websocket.Conn // set only while runOnce holds an open connection
+	lastConnected time.Time       // zero until the first successful helloAck
 }
 
 // New builds an Agent. settingsPath is where the operator's API
 // key/cloud URL/enabled flag are persisted (see SettingsStore); every
-// other parameter is the exact same dependency (often the exact same
-// *Store instance) internal/server.New already constructs, passed
-// through rather than built twice — see (*server.Server).StartCloudAgent.
+// dependency through sa818StatePath is the exact same one (often the
+// exact same *Store instance) internal/server.New already constructs,
+// passed through rather than built twice — see
+// (*server.Server).StartCloudAgent. auditLogPath is where every
+// dispatched action is independently recorded (see audit.go); an empty
+// path disables audit logging entirely.
 func New(
 	settingsPath string,
 	store *config.Store,
@@ -101,6 +106,7 @@ func New(
 	skywarnDir string,
 	sa818Tool string,
 	sa818StatePath string,
+	auditLogPath string,
 ) *Agent {
 	return &Agent{
 		settings:       NewSettingsStore(settingsPath),
@@ -113,8 +119,19 @@ func New(
 		skywarnDir:     skywarnDir,
 		sa818Tool:      sa818Tool,
 		sa818StatePath: sa818StatePath,
+		audit:          newAuditWriter(auditLogPath),
 		reload:         make(chan struct{}),
 	}
+}
+
+// LastConnected reports when this Agent's connection to the cloud last
+// completed a successful hello handshake — the zero Time if it has
+// never connected this process lifetime. Exposed for the local Cloud
+// Sync settings card to show as a simple, honest liveness signal.
+func (a *Agent) LastConnected() time.Time {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.lastConnected
 }
 
 // Settings exposes the settings store so internal/server's Cloud Sync

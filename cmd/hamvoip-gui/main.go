@@ -41,6 +41,7 @@ func main() {
 	wxTonesPath := flag.String("wx-tones-file", "/etc/hamvoip-gui/wx-tones.json", "path to store the operator's own alert-driven courtesy-tone mappings (see internal/wxtone's package doc) — a safer, fully-visible alternative to SkywarnPlus's own courtesy-tone swap")
 	cloudSettingsPath := flag.String("cloud-settings-file", "/etc/hamvoip-gui/cloud-agent.json", "path to store this node's cloud API key/URL/enabled flag for the optional public cloud platform connection (see internal/cloudagent's package doc) — off until the operator opts in on the Cloud Sync settings card")
 	cloudURL := flag.String("cloud-url", "", "default WebSocket URL of the public cloud platform (wss://...), pre-filling the Cloud Sync settings card the first time it's opened; leave empty to require the operator to enter one explicitly")
+	cloudAuditLog := flag.String("cloud-audit-log", "/var/log/hamvoip-gui/cloud-actions.log", "path to record every action the cloud connection relays to this device, independent of the cloud site's own records — see internal/cloudagent's package doc")
 	flag.Parse()
 
 	templatesFS, err := fs.Sub(web.Templates, "templates")
@@ -65,7 +66,7 @@ func main() {
 
 	store := config.NewStore(*asteriskEtc)
 
-	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir, *skywarnDir, *wxTonesPath, *cloudSettingsPath, *cloudURL)
+	srv, err := server.New(store, authMgr, templatesFS, staticFS, *asteriskBin, *asteriskLog, *sa818Tool, *sa818StatePath, *nodeDBPath, *nodeDBURL, *soundsCustomDir, *soundsStockDir, *soxTool, *soundSchedulePath, *ttsTool, *ttsVoicesDir, *skywarnDir, *wxTonesPath, *cloudSettingsPath, *cloudURL, *cloudAuditLog)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

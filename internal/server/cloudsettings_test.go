@@ -21,6 +21,7 @@ func newCloudTestServer(t *testing.T, cloudURLDefault string) *Server {
 		soundschedule.New(filepath.Join(t.TempDir(), "sound-schedule.json")),
 		wxtone.New(filepath.Join(t.TempDir(), "wx-tones.json")),
 		"", "818-prog", filepath.Join(t.TempDir(), "sa818-last.json"),
+		"",
 	)
 	return &Server{
 		store:           store,
