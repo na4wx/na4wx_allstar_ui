@@ -70,6 +70,7 @@ type Agent struct {
 	settings    *SettingsStore
 	store       *config.Store
 	asteriskBin string
+	live        *liveWatches
 
 	mu         sync.Mutex
 	reload     chan struct{}
@@ -85,6 +86,7 @@ func New(settingsPath string, store *config.Store, asteriskBin string) *Agent {
 		settings:    NewSettingsStore(settingsPath),
 		store:       store,
 		asteriskBin: asteriskBin,
+		live:        newLiveWatches(),
 		reload:      make(chan struct{}),
 	}
 }

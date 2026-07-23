@@ -103,8 +103,12 @@ func (a *Agent) heartbeatLoop(ctx context.Context, conn *websocket.Conn) {
 
 // readLoop reads relayed messages until the connection ends (error, or
 // ctx cancelled), dispatching each "call" concurrently so one slow
-// action can't stall replies to others queued behind it.
+// action can't stall replies to others queued behind it. Always tears
+// down every active live watch on the way out (see liveWatches.stopAll)
+// so a dropped connection never leaves a poller running for a cloud
+// session that's already gone.
 func (a *Agent) readLoop(ctx context.Context, conn *websocket.Conn) {
+	defer a.live.stopAll()
 	for {
 		var msg envelope
 		if err := wsjson.Read(ctx, conn, &msg); err != nil {
@@ -113,8 +117,10 @@ func (a *Agent) readLoop(ctx context.Context, conn *websocket.Conn) {
 		switch msg.Type {
 		case typeCall:
 			go a.handleCall(ctx, conn, msg)
-		case typeWatch, typeUnwatch:
-			// Phase 3: on-demand per-node live watch.
+		case typeWatch:
+			a.live.watch(ctx, a, conn, msg.Node)
+		case typeUnwatch:
+			a.live.unwatch(msg.Node)
 		}
 	}
 }
