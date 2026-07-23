@@ -52,6 +52,12 @@ func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
 		"sounds.listAll": true,
 		"sounds.upload":  true,
 		"sounds.delete":  true,
+
+		"rawconfig.listFiles":  true,
+		"rawconfig.getFile":    true,
+		"rawconfig.setKey":     true,
+		"rawconfig.addKey":     true,
+		"rawconfig.addSection": true,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("actions() has %d entries, want %d: %v", len(got), len(want), keysOf(got))

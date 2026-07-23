@@ -290,6 +290,35 @@ func (f *File) SectionKeys(section string) []KV {
 	return out
 }
 
+// SetNthKeyInSection sets the value of the nth KindKeyValue line within
+// section (0-indexed, in file order) -- the position-indexed
+// counterpart to Set's by-key lookup, needed when a section has
+// repeated keys and the caller must edit one specific occurrence rather
+// than "the first line named key" (e.g. extensions.conf's repeated
+// "exten =>" lines). Reports whether a matching line was found. Shared
+// by internal/server's raw config editor and internal/cloudagent's
+// relayed rawconfig.setKey action, so the two can't drift on what "the
+// nth line" means.
+func (f *File) SetNthKeyInSection(section string, n int, value string) bool {
+	start, end, ok := f.sectionBounds(section)
+	if !ok {
+		return false
+	}
+	count := -1
+	for i := start; i < end; i++ {
+		l := f.Lines[i]
+		if l.Kind != KindKeyValue {
+			continue
+		}
+		count++
+		if count == n {
+			l.SetValue(value)
+			return true
+		}
+	}
+	return false
+}
+
 // Get returns the first value for key within section.
 func (f *File) Get(section, key string) (string, bool) {
 	start, end, ok := f.sectionBounds(section)

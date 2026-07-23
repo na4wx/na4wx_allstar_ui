@@ -295,3 +295,41 @@ func TestSectionKeysOrderPreserved(t *testing.T) {
 		}
 	}
 }
+
+func TestSetNthKeyInSectionAddressesDuplicateKeysIndependently(t *testing.T) {
+	f, err := Parse(strings.NewReader(extensionsFixture))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if ok := f.SetNthKeyInSection("macro-autopatchup", 2, "s,n,Authenticate(9999)"); !ok {
+		t.Fatal("SetNthKeyInSection() = false, want true")
+	}
+	all := f.GetAll("macro-autopatchup", "exten")
+	want := []string{
+		"s,1,Set(TIMEOUT(digit)=5)",
+		"s,n,Set(TIMEOUT(response)=10)",
+		"s,n,Authenticate(9999)",
+		"s,n,Wait(1)",
+	}
+	if len(all) != len(want) {
+		t.Fatalf("got %d exten values, want %d: %v", len(all), len(want), all)
+	}
+	for i, w := range want {
+		if all[i] != w {
+			t.Errorf("exten[%d] = %q, want %q", i, all[i], w)
+		}
+	}
+}
+
+func TestSetNthKeyInSectionUnknownSectionOrIndex(t *testing.T) {
+	f, err := Parse(strings.NewReader(rptFixture))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if ok := f.SetNthKeyInSection("does-not-exist", 0, "x"); ok {
+		t.Error("SetNthKeyInSection() = true for an unknown section, want false")
+	}
+	if ok := f.SetNthKeyInSection("2000", 999, "x"); ok {
+		t.Error("SetNthKeyInSection() = true for an out-of-range index, want false")
+	}
+}

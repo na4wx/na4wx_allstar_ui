@@ -6,27 +6,8 @@ import (
 	"strings"
 
 	"hamvoipconfiggui/internal/asteriskconf"
+	"hamvoipconfiggui/internal/config"
 )
-
-// allowedConfigFiles whitelists which files the generic editor may touch,
-// since the "file" path segment ultimately becomes a filesystem path.
-var allowedConfigFiles = []string{
-	"rpt.conf",
-	"iax.conf",
-	"usbradio.conf",
-	"simpleusb.conf",
-	"voter.conf",
-	"extensions.conf",
-}
-
-func isAllowedConfigFile(name string) bool {
-	for _, f := range allowedConfigFiles {
-		if f == name {
-			return true
-		}
-	}
-	return false
-}
 
 // configPageData backs config.html for both the file-picker index and a
 // selected file's editor, so the template can reference .Selected /
@@ -46,13 +27,13 @@ type configSection struct {
 func (s *Server) handleConfigIndex(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "config.html", configPageData{
 		pageData: pageData{LoggedIn: true},
-		Files:    allowedConfigFiles,
+		Files:    config.AllowedRawConfigFiles,
 	})
 }
 
 func (s *Server) handleConfigFile(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("file")
-	if !isAllowedConfigFile(name) {
+	if !config.IsAllowedRawConfigFile(name) {
 		http.NotFound(w, r)
 		return
 	}
@@ -60,7 +41,7 @@ func (s *Server) handleConfigFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.render(w, "config.html", configPageData{
 			pageData: flash("error", err.Error()),
-			Files:    allowedConfigFiles,
+			Files:    config.AllowedRawConfigFiles,
 		})
 		return
 	}
@@ -72,7 +53,7 @@ func (s *Server) handleConfigFile(w http.ResponseWriter, r *http.Request) {
 
 	s.render(w, "config.html", configPageData{
 		pageData: pageData{LoggedIn: true},
-		Files:    allowedConfigFiles,
+		Files:    config.AllowedRawConfigFiles,
 		Selected: name,
 		Sections: sections,
 	})
@@ -88,7 +69,7 @@ func (s *Server) handleConfigFile(w http.ResponseWriter, r *http.Request) {
 // section.
 func (s *Server) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("file")
-	if !isAllowedConfigFile(name) {
+	if !config.IsAllowedRawConfigFile(name) {
 		http.NotFound(w, r)
 		return
 	}
@@ -113,7 +94,7 @@ func (s *Server) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 			formKey := "kv:" + sec + ":" + strconv.Itoa(i)
 			if newVal, ok := r.Form[formKey]; ok && len(newVal) > 0 {
 				if newVal[0] != pair.Value {
-					setNthLineInSection(f, sec, i, newVal[0])
+					f.SetNthKeyInSection(sec, i, newVal[0])
 				}
 			}
 		}
@@ -131,30 +112,4 @@ func (s *Server) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/config/"+name, http.StatusSeeOther)
-}
-
-// setNthLineInSection updates the value of the n-th key/value line
-// within section, where n matches its position in
-// asteriskconf.File.SectionKeys(section) — i.e. its position among all
-// key/value lines in that section, not just among same-named keys. This
-// is what lets duplicate keys (extensions.conf's repeated "exten =>")
-// be addressed unambiguously; asteriskconf.File.Set only ever targets
-// the first occurrence of a key, which isn't enough here.
-func setNthLineInSection(f *asteriskconf.File, section string, n int, value string) {
-	count := -1
-	inSection := false
-	for _, l := range f.Lines {
-		if l.Kind == asteriskconf.KindSection {
-			inSection = l.Section == section
-			continue
-		}
-		if !inSection || l.Kind != asteriskconf.KindKeyValue {
-			continue
-		}
-		count++
-		if count == n {
-			l.SetValue(value)
-			return
-		}
-	}
 }
