@@ -335,6 +335,28 @@ log "Deploying"
 
 log "Done"
 
-echo "This script installed the HamVoIP GUI and its dependencies (already running via systemd). If you installed SkywarnPlus, finish its setup on the node's Automation tab."
+cat <<'EOF'
+╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║     ███╗   ██╗ █████╗ ██╗  ██╗██╗    ██╗██╗  ██╗         ║
+║     ████╗  ██║██╔══██╗██║  ██║██║    ██║╚██╗██╔╝         ║
+║     ██╔██╗ ██║███████║███████║██║ █╗ ██║ ╚███╔╝          ║
+║     ██║╚██╗██║██╔══██║╚════██║██║███╗██║ ██╔██╗          ║
+║     ██║ ╚████║██║  ██║     ██║╚███╔███╔╝██╔╝ ██╗         ║
+║     ╚═╝  ╚═══╝╚═╝  ╚═╝     ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝         ║
+║     ____________________________________________         ║
+║            A L L S T A R   D A S H B O A R D             ║
+║     ____________________________________________         ║
+╚══════════════════════════════════════════════════════════╝
+EOF
+
+echo
+echo "This script has installed the HamVoIP GUI and its dependencies (already running via systemd). If you installed SkywarnPlus, finish its setup on the node's Automation tab."
+
+if [ ! -d "$SKYWARN_DIR" ]; then
+    echo
+    echo "You can re-run this script later to install SkywarnPlus."
+fi
+echo "You can re-run this script at any time to update the application to the latest version from git."
+echo
 echo "Visit http://<node-ip>:8088 in a browser to access the GUI."
-echo "You can re-run this script later to update the GUI and its dependencies, or to install SkywarnPlus if you skipped it."
