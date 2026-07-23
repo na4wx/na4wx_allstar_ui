@@ -55,7 +55,11 @@ Instead of SkywarnPlus's own courtesy-tone swap, this app offers its own safer a
 
 ### System
 
-Device name, static IP / DHCP, radio device management, SHARI USB audio preset, SA818/DRA818 module programming (frequency, CTCSS, squelch — over serial via `818-prog`), Asterisk restart and reboot, admin password, and a log tail.
+Device name, static IP / DHCP, radio device management, SHARI USB audio preset, SA818/DRA818 module programming (frequency, CTCSS, squelch — over serial via `818-prog`), Asterisk restart and reboot, admin password, a log tail, and Cloud Sync settings.
+
+### Cloud Sync (optional)
+
+Off by default. Paste in an API key generated on [NA4WX Allstar Cloud](https://github.com/na4wx/NA4WX-Allstar-Cloud) — a separate, optional public website — and this node dials out to it (never the reverse, so nothing needs forwarding on your router) for remote management from anywhere: the same node config, sounds, WX tones, sound scheduling, SA818 programming, and SkywarnPlus settings as the local UI, plus (each its own separate opt-in) remote Asterisk restart/reboot and raw config editing. See that repo's `docs/PROTOCOL.md` and `docs/SECURITY.md` for exactly what it can do and how the connection is secured. Unchecking this — or physically pulling the node offline — cuts the connection immediately regardless of what the cloud site thinks.
 
 ### Raw Config
 
