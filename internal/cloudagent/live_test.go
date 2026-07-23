@@ -42,7 +42,7 @@ func TestWatchStartsPushingLiveEvents(t *testing.T) {
 		}
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go a.runOnce(ctx, Settings{CloudURL: url, APIKey: "test-key", Enabled: true})
@@ -95,7 +95,7 @@ func TestUnwatchStopsPushingLiveEvents(t *testing.T) {
 		}
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 	defer cancel()
 	go a.runOnce(ctx, Settings{CloudURL: url, APIKey: "test-key", Enabled: true})
@@ -130,7 +130,7 @@ drain:
 // event rate).
 func TestWatchIsIdempotent(t *testing.T) {
 	lw := newLiveWatches()
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 
 	url := startFakeCloud(t, func(ctx context.Context, conn *websocket.Conn) {
 		<-ctx.Done()

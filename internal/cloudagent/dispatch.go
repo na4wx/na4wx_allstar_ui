@@ -22,10 +22,33 @@ func (a *Agent) actions() map[string]actionFunc {
 		"system.status":          a.actionSystemStatus,
 		"system.restartAsterisk": a.actionSystemRestartAsterisk,
 		"system.reboot":          a.actionSystemReboot,
-		"config.listNodes":       a.actionConfigListNodes,
-		"config.loadNode":        a.actionConfigLoadNode,
-		"config.saveNode":        a.actionConfigSaveNode,
-		"config.deleteNode":      a.actionConfigDeleteNode,
+
+		"config.listNodes":  a.actionConfigListNodes,
+		"config.loadNode":   a.actionConfigLoadNode,
+		"config.saveNode":   a.actionConfigSaveNode,
+		"config.deleteNode": a.actionConfigDeleteNode,
+
+		"soundSchedule.list":   a.actionSoundScheduleList,
+		"soundSchedule.save":   a.actionSoundScheduleSave,
+		"soundSchedule.delete": a.actionSoundScheduleDelete,
+
+		"wxTone.list":   a.actionWXToneList,
+		"wxTone.save":   a.actionWXToneSave,
+		"wxTone.delete": a.actionWXToneDelete,
+
+		"sa818.program": a.actionSA818Program,
+
+		"skywarn.listCounties":   a.actionSkywarnListCounties,
+		"skywarn.getStatus":      a.actionSkywarnGetStatus,
+		"skywarn.setToggle":      a.actionSkywarnSetToggle,
+		"skywarn.setCounties":    a.actionSkywarnSetCounties,
+		"skywarn.addNode":        a.actionSkywarnAddNode,
+		"skywarn.setPushover":    a.actionSkywarnSetPushover,
+		"skywarn.setSkyDescribe": a.actionSkywarnSetSkyDescribe,
+
+		"sounds.listAll": a.actionSoundsListAll,
+		"sounds.upload":  a.actionSoundsUpload,
+		"sounds.delete":  a.actionSoundsDelete,
 	}
 }
 

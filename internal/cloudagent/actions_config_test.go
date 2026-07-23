@@ -21,7 +21,7 @@ func newConfigTestAgent(t *testing.T) *Agent {
 		t.Fatalf("write fixture: %v", err)
 	}
 	store := config.NewStore(asteriskDir)
-	return New(filepath.Join(t.TempDir(), "settings.json"), store, "asterisk")
+	return newTestAgent(t, filepath.Join(t.TempDir(), "settings.json"), store, "asterisk")
 }
 
 func TestActionConfigListNodes(t *testing.T) {

@@ -33,6 +33,9 @@ import (
 	"github.com/coder/websocket"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/sounds"
+	"hamvoipconfiggui/internal/soundschedule"
+	"hamvoipconfiggui/internal/wxtone"
 )
 
 // Backoff/timing constants for Run's reconnect loop and heartbeat.
@@ -67,10 +70,16 @@ const (
 // internal/server (see (*Server).StartCloudAgent) and run for the
 // life of the process.
 type Agent struct {
-	settings    *SettingsStore
-	store       *config.Store
-	asteriskBin string
-	live        *liveWatches
+	settings       *SettingsStore
+	store          *config.Store
+	asteriskBin    string
+	live           *liveWatches
+	sounds         *sounds.Store
+	soundSchedule  *soundschedule.Store
+	wxTones        *wxtone.Store
+	skywarnDir     string
+	sa818Tool      string
+	sa818StatePath string
 
 	mu         sync.Mutex
 	reload     chan struct{}
@@ -78,16 +87,33 @@ type Agent struct {
 }
 
 // New builds an Agent. settingsPath is where the operator's API
-// key/cloud URL/enabled flag are persisted (see SettingsStore); store
-// and asteriskBin are the same dependencies internal/server.New already
-// takes, reused here rather than duplicated.
-func New(settingsPath string, store *config.Store, asteriskBin string) *Agent {
+// key/cloud URL/enabled flag are persisted (see SettingsStore); every
+// other parameter is the exact same dependency (often the exact same
+// *Store instance) internal/server.New already constructs, passed
+// through rather than built twice — see (*server.Server).StartCloudAgent.
+func New(
+	settingsPath string,
+	store *config.Store,
+	asteriskBin string,
+	soundsStore *sounds.Store,
+	soundSchedule *soundschedule.Store,
+	wxTones *wxtone.Store,
+	skywarnDir string,
+	sa818Tool string,
+	sa818StatePath string,
+) *Agent {
 	return &Agent{
-		settings:    NewSettingsStore(settingsPath),
-		store:       store,
-		asteriskBin: asteriskBin,
-		live:        newLiveWatches(),
-		reload:      make(chan struct{}),
+		settings:       NewSettingsStore(settingsPath),
+		store:          store,
+		asteriskBin:    asteriskBin,
+		live:           newLiveWatches(),
+		sounds:         soundsStore,
+		soundSchedule:  soundSchedule,
+		wxTones:        wxTones,
+		skywarnDir:     skywarnDir,
+		sa818Tool:      sa818Tool,
+		sa818StatePath: sa818StatePath,
+		reload:         make(chan struct{}),
 	}
 }
 

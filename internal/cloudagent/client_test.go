@@ -57,7 +57,7 @@ func TestRunOnceHelloAckAndHeartbeat(t *testing.T) {
 		}
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -93,7 +93,7 @@ func TestRunOnceRejectedHelloReturnsFalse(t *testing.T) {
 		_ = wsjson.Write(ctx, conn, envelope{Type: typeHelloAck, OK: false, Error: "invalid api key"})
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -130,7 +130,7 @@ func TestRunOnceHandlesRelayedCall(t *testing.T) {
 		}
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go a.runOnce(ctx, Settings{CloudURL: url, APIKey: "test-key", Enabled: true})
@@ -178,7 +178,7 @@ func TestReloadClosesActiveConnection(t *testing.T) {
 		}
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -234,7 +234,7 @@ func TestRunOnceUnknownActionReturnsErrorResult(t *testing.T) {
 		}
 	})
 
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go a.runOnce(ctx, Settings{CloudURL: url, APIKey: "test-key", Enabled: true})

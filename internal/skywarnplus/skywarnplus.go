@@ -66,16 +66,18 @@ func IsInstalled(dir string) bool {
 
 // Status is SkywarnPlus's current configuration, as reported by
 // sky_configure.py status.
+// JSON tags exist only for internal/cloudagent's relayed skywarnplus.*
+// actions.
 type Status struct {
-	Enable      bool
-	SayAlert    bool
-	SayAllClear bool
-	Tailmessage bool
-	AlertScript bool
-	CountyCodes []string
-	Nodes       []string
-	Pushover    PushoverStatus
-	SkyDescribe SkyDescribeStatus
+	Enable      bool              `json:"enable"`
+	SayAlert    bool              `json:"sayAlert"`
+	SayAllClear bool              `json:"sayAllClear"`
+	Tailmessage bool              `json:"tailmessage"`
+	AlertScript bool              `json:"alertScript"`
+	CountyCodes []string          `json:"countyCodes"`
+	Nodes       []string          `json:"nodes"`
+	Pushover    PushoverStatus    `json:"pushover"`
+	SkyDescribe SkyDescribeStatus `json:"skyDescribe"`
 
 	// CourtesyToneSwapEnabled/IDSwapEnabled report whether SkywarnPlus's
 	// own courtesy-tone/ID swap (CourtesyTones.Enable / IDChange.Enable
@@ -83,15 +85,15 @@ type Status struct {
 	// swap itself (see this package's doc comment for why), but surfaces
 	// it read-only so the UI can warn before an operator edits a file
 	// SkywarnPlus might change out from under them.
-	CourtesyToneSwapEnabled bool
-	IDSwapEnabled           bool
+	CourtesyToneSwapEnabled bool `json:"courtesyToneSwapEnabled"`
+	IDSwapEnabled           bool `json:"idSwapEnabled"`
 
 	// ActiveAlertCount is how many weather alerts SkywarnPlus currently
 	// has active for the operator's configured county codes, read
 	// straight from its own already-fetched runtime state (see
 	// GetStatus's doc comment) — not a second alert source this app
 	// fetches itself.
-	ActiveAlertCount int
+	ActiveAlertCount int `json:"activeAlertCount"`
 }
 
 // PushoverStatus is SkywarnPlus's Pushover push-notification settings.
@@ -100,10 +102,10 @@ type Status struct {
 // doesn't include Pushover), so every field goes through
 // sky_configure.py's own set-pushover.
 type PushoverStatus struct {
-	Enable   bool
-	UserKey  string
-	APIToken string
-	Debug    bool
+	Enable   bool   `json:"enable"`
+	UserKey  string `json:"userKey"`
+	APIToken string `json:"apiToken"`
+	Debug    bool   `json:"debug"`
 }
 
 // SkyDescribeStatus is SkywarnPlus's SkyDescribe (VoiceRSS-based
@@ -111,11 +113,11 @@ type PushoverStatus struct {
 // of its own — see SetSkyDescribe's doc comment — so there's no Enable
 // field here, only its connection/voice settings.
 type SkyDescribeStatus struct {
-	APIKey   string
-	Language string
-	Speed    int
-	Voice    string
-	MaxWords int
+	APIKey   string `json:"apiKey"`
+	Language string `json:"language"`
+	Speed    int    `json:"speed"`
+	Voice    string `json:"voice"`
+	MaxWords int    `json:"maxWords"`
 }
 
 // runPython runs `python3 <dir>/<script> <args...>`, matching this

@@ -18,17 +18,40 @@ import (
 // reflection-based or wildcard dispatcher would have to change this
 // test too, not slip in silently.
 func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	got := a.actions()
 
 	want := map[string]bool{
 		"system.status":          true,
 		"system.restartAsterisk": true,
 		"system.reboot":          true,
-		"config.listNodes":       true,
-		"config.loadNode":        true,
-		"config.saveNode":        true,
-		"config.deleteNode":      true,
+
+		"config.listNodes":  true,
+		"config.loadNode":   true,
+		"config.saveNode":   true,
+		"config.deleteNode": true,
+
+		"soundSchedule.list":   true,
+		"soundSchedule.save":   true,
+		"soundSchedule.delete": true,
+
+		"wxTone.list":   true,
+		"wxTone.save":   true,
+		"wxTone.delete": true,
+
+		"sa818.program": true,
+
+		"skywarn.listCounties":   true,
+		"skywarn.getStatus":      true,
+		"skywarn.setToggle":      true,
+		"skywarn.setCounties":    true,
+		"skywarn.addNode":        true,
+		"skywarn.setPushover":    true,
+		"skywarn.setSkyDescribe": true,
+
+		"sounds.listAll": true,
+		"sounds.upload":  true,
+		"sounds.delete":  true,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("actions() has %d entries, want %d: %v", len(got), len(want), keysOf(got))
@@ -49,14 +72,14 @@ func keysOf(m map[string]actionFunc) []string {
 }
 
 func TestDispatchUnknownActionIsError(t *testing.T) {
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	if _, err := a.dispatch(context.Background(), "system.reboot", nil); err == nil {
 		t.Fatal("dispatch() error = nil, want an error for an action not in the registry")
 	}
 }
 
 func TestDispatchSystemStatus(t *testing.T) {
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
 	result, err := a.dispatch(context.Background(), "system.status", nil)
 	if err != nil {
 		t.Fatalf("dispatch(system.status) error = %v", err)

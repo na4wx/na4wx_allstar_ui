@@ -54,7 +54,7 @@ func TestActionSystemRestartAsteriskRunsWhenEnabled(t *testing.T) {
 
 	settingsPath := filepath.Join(t.TempDir(), "settings.json")
 	store := config.NewStore(t.TempDir())
-	a := New(settingsPath, store, bin)
+	a := newTestAgent(t, settingsPath, store, bin)
 	if err := a.Settings().Save(Settings{Enabled: true, AllowRemoteReboot: true}); err != nil {
 		t.Fatal(err)
 	}

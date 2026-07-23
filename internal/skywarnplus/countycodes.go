@@ -20,10 +20,10 @@ var countyCodesMD string
 // CountyOption is one selectable county in the picker.
 type CountyOption struct {
 	// Label is what's shown in the picker, e.g. "Autauga, AL (ALC001)".
-	Label string
+	Label string `json:"label"`
 	// Code is the NWS county code submitted back to SetCounties, e.g.
 	// "ALC001".
-	Code string
+	Code string `json:"code"`
 }
 
 // stateHeaderRe matches CountyCodes.md's "## XX" state section headers —

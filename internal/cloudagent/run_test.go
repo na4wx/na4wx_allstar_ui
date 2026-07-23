@@ -47,7 +47,7 @@ func TestJitterZeroIsZero(t *testing.T) {
 // to reach a cloud URL until the operator has actually opted in with a
 // URL and key.
 func TestRunSkipsConnectingWhenDisabled(t *testing.T) {
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
 	a.Run(ctx) // Settings default to zero value (Enabled: false) -- must return via ctx timeout, not hang or panic on a nil/empty CloudURL dial.
@@ -57,7 +57,7 @@ func TestRunSkipsConnectingWhenDisabled(t *testing.T) {
 // rather than being a no-op -- the settings-save handler depends on
 // this to make turning the feature on take effect promptly.
 func TestReloadWakesWaitEarly(t *testing.T) {
-	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	done := make(chan bool, 1)
 	go func() {
 		done <- a.wait(context.Background(), 10*time.Second)

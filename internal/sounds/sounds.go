@@ -51,12 +51,13 @@ var soundExtensions = map[string]bool{
 	".g722": true,
 }
 
-// File is one playable sound this app knows about.
+// File is one playable sound this app knows about. JSON tags exist only
+// for internal/cloudagent's relayed sounds.* actions.
 type File struct {
 	// Name is the bare reference name with no directory prefix or
 	// extension, e.g. "node-id" or "callproceeding" — how the file is
 	// identified in the UI.
-	Name string
+	Name string `json:"name"`
 	// Ref is exactly what app_rpt/rpt.conf wants written into a field
 	// like idrecording or a telemetry value to play this file (always
 	// without an extension — Asterisk appends whichever format it
@@ -73,10 +74,10 @@ type File struct {
 	// the first place). So Ref is an absolute path
 	// (/etc/asterisk/local/node-id) for a custom file, but stays a bare
 	// rpt/-prefixed name for a stock one.
-	Ref string
+	Ref string `json:"ref"`
 	// Custom is true for a file in the custom (uploadable/manageable)
 	// directory, false for a stock library file (read-only reference).
-	Custom bool
+	Custom bool `json:"custom"`
 }
 
 // Store manages the custom sound directory and lists the stock one.

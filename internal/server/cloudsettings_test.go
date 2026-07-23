@@ -6,15 +6,25 @@ import (
 
 	"hamvoipconfiggui/internal/cloudagent"
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/sounds"
+	"hamvoipconfiggui/internal/soundschedule"
+	"hamvoipconfiggui/internal/wxtone"
 )
 
 func newCloudTestServer(t *testing.T, cloudURLDefault string) *Server {
 	t.Helper()
 	settingsPath := filepath.Join(t.TempDir(), "cloud-agent.json")
 	store := config.NewStore(t.TempDir())
+	agent := cloudagent.New(
+		settingsPath, store, "asterisk",
+		sounds.New(t.TempDir(), t.TempDir(), "sox"),
+		soundschedule.New(filepath.Join(t.TempDir(), "sound-schedule.json")),
+		wxtone.New(filepath.Join(t.TempDir(), "wx-tones.json")),
+		"", "818-prog", filepath.Join(t.TempDir(), "sa818-last.json"),
+	)
 	return &Server{
 		store:           store,
-		cloudAgent:      cloudagent.New(settingsPath, store, "asterisk"),
+		cloudAgent:      agent,
 		cloudURLDefault: cloudURLDefault,
 	}
 }
