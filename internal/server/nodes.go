@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"hamvoipconfiggui/internal/automation"
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/skywarnplus"
 	"hamvoipconfiggui/internal/sounds"
@@ -128,7 +129,7 @@ type nodeFormData struct {
 	// scheduler, see automation.go) and scheduled sound playback (its own
 	// ticker, see soundschedule.go).
 	SchedulerSect         string
-	AutomationConnections []automationRow
+	AutomationConnections []automation.Row
 	SoundSchedules        []soundschedule.Entry
 
 	// Weather Alerts (SkywarnPlus): configuration for an operator-installed

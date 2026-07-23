@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"hamvoipconfiggui/internal/automation"
 	"hamvoipconfiggui/internal/soundschedule"
 	"hamvoipconfiggui/internal/system"
 )
@@ -125,7 +126,7 @@ func (s *Server) handleNodeAutomationSoundSave(w http.ResponseWriter, r *http.Re
 	dom := strings.TrimSpace(r.FormValue("dom"))
 	month := strings.TrimSpace(r.FormValue("month"))
 	for _, v := range []string{minute, hour, dom, month} {
-		if !timeFieldRe.MatchString(v) {
+		if !automation.TimeFieldRe.MatchString(v) {
 			s.renderNodeEditPage(w, r, number, flash("error", "Minute/hour/day-of-month/month must each be a single number or *"))
 			return
 		}

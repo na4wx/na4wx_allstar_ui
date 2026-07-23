@@ -25,21 +25,38 @@ func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
 		"system.status":          true,
 		"system.restartAsterisk": true,
 		"system.reboot":          true,
+		"system.dtmf":            true,
 
-		"config.listNodes":  true,
-		"config.loadNode":   true,
-		"config.saveNode":   true,
-		"config.deleteNode": true,
+		"config.listNodes":               true,
+		"config.loadNode":                true,
+		"config.saveNode":                true,
+		"config.deleteNode":              true,
+		"config.setCourtesyTones":        true,
+		"config.listTelemetry":           true,
+		"config.setTelemetry":            true,
+		"config.listFunctionMacros":      true,
+		"config.saveFunctionMacro":       true,
+		"config.deleteFunctionMacro":     true,
+		"config.cloneNodeConfig":         true,
+		"config.applyStandardCommandSet": true,
+		"config.normalizeNodeConfig":     true,
 
 		"soundSchedule.list":   true,
 		"soundSchedule.save":   true,
 		"soundSchedule.delete": true,
+
+		"schedule.list":             true,
+		"schedule.saveConnection":   true,
+		"schedule.deleteConnection": true,
 
 		"wxTone.list":   true,
 		"wxTone.save":   true,
 		"wxTone.delete": true,
 
 		"sa818.program": true,
+
+		"iax.loadRegistration": true,
+		"iax.saveRegistration": true,
 
 		"skywarn.listCounties":   true,
 		"skywarn.getStatus":      true,

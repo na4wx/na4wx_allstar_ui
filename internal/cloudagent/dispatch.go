@@ -23,21 +23,38 @@ func (a *Agent) actions() map[string]actionFunc {
 		"system.status":          a.actionSystemStatus,
 		"system.restartAsterisk": a.actionSystemRestartAsterisk,
 		"system.reboot":          a.actionSystemReboot,
+		"system.dtmf":            a.actionSystemDTMF,
 
-		"config.listNodes":  a.actionConfigListNodes,
-		"config.loadNode":   a.actionConfigLoadNode,
-		"config.saveNode":   a.actionConfigSaveNode,
-		"config.deleteNode": a.actionConfigDeleteNode,
+		"config.listNodes":               a.actionConfigListNodes,
+		"config.loadNode":                a.actionConfigLoadNode,
+		"config.saveNode":                a.actionConfigSaveNode,
+		"config.deleteNode":              a.actionConfigDeleteNode,
+		"config.setCourtesyTones":        a.actionConfigSetCourtesyTones,
+		"config.listTelemetry":           a.actionConfigListTelemetry,
+		"config.setTelemetry":            a.actionConfigSetTelemetry,
+		"config.listFunctionMacros":      a.actionConfigListFunctionMacros,
+		"config.saveFunctionMacro":       a.actionConfigSaveFunctionMacro,
+		"config.deleteFunctionMacro":     a.actionConfigDeleteFunctionMacro,
+		"config.cloneNodeConfig":         a.actionConfigCloneNodeConfig,
+		"config.applyStandardCommandSet": a.actionConfigApplyStandardCommandSet,
+		"config.normalizeNodeConfig":     a.actionConfigNormalizeNodeConfig,
 
 		"soundSchedule.list":   a.actionSoundScheduleList,
 		"soundSchedule.save":   a.actionSoundScheduleSave,
 		"soundSchedule.delete": a.actionSoundScheduleDelete,
+
+		"schedule.list":             a.actionScheduleList,
+		"schedule.saveConnection":   a.actionScheduleSaveConnection,
+		"schedule.deleteConnection": a.actionScheduleDeleteConnection,
 
 		"wxTone.list":   a.actionWXToneList,
 		"wxTone.save":   a.actionWXToneSave,
 		"wxTone.delete": a.actionWXToneDelete,
 
 		"sa818.program": a.actionSA818Program,
+
+		"iax.loadRegistration": a.actionIAXLoadRegistration,
+		"iax.saveRegistration": a.actionIAXSaveRegistration,
 
 		"skywarn.listCounties":   a.actionSkywarnListCounties,
 		"skywarn.getStatus":      a.actionSkywarnGetStatus,
