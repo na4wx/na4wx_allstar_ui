@@ -1,4 +1,4 @@
-package server
+package rptstatus
 
 import (
 	"testing"
@@ -20,14 +20,14 @@ var realDirectory = fakeDirectory{
 }
 
 func TestBuildLinkTablesAddsCallsigns(t *testing.T) {
-	snaps := []linkSnapshot{{
+	snaps := []LinkSnapshot{{
 		At:         time.Now(),
 		Nodes:      []string{"49616", "99999"},
 		ActivityOK: true,
 		Headers:    []string{"NODE", "PEER", "CONNECT TIME"},
 		Rows:       [][]string{{"49616", "somepeer", "00:05:12"}},
 	}}
-	connected, headers, activity := buildLinkTables(realDirectory, snaps)
+	connected, headers, activity := BuildLinkTables(realDirectory, snaps)
 
 	if got := connected[0].Nodes[0]; got.Number != "49616" || got.Callsign != "WB4GBI" {
 		t.Errorf("connected[0] = %+v, want 49616/WB4GBI", got)
@@ -65,7 +65,7 @@ func TestBuildLinkTablesAddsCallsigns(t *testing.T) {
 // inserted Callsign column must appear in both the header row and every
 // data row, or every value after it renders under the wrong heading.
 func TestBuildLinkTablesColumnCountsMatch(t *testing.T) {
-	snaps := []linkSnapshot{{
+	snaps := []LinkSnapshot{{
 		At:         time.Now(),
 		ActivityOK: true,
 		Headers:    []string{"NODE", "PEER", "RECONNECTS", "DIRECTION", "CONNECT TIME", "CONNECT STATE"},
@@ -74,7 +74,7 @@ func TestBuildLinkTablesColumnCountsMatch(t *testing.T) {
 			{"52829", "q", "1", "IN", "00:00:07", "ESTABLISHED"},
 		},
 	}}
-	_, headers, activity := buildLinkTables(realDirectory, snaps)
+	_, headers, activity := BuildLinkTables(realDirectory, snaps)
 	for i, rec := range activity {
 		if len(rec.Fields) != len(headers) {
 			t.Errorf("row %d has %d fields but there are %d headers (%q vs %q)",
@@ -86,8 +86,8 @@ func TestBuildLinkTablesColumnCountsMatch(t *testing.T) {
 // TestBuildLinkTablesNilDirectory covers the pre-download state: no
 // database yet must not break the page, just omit callsigns.
 func TestBuildLinkTablesNilDirectory(t *testing.T) {
-	snaps := []linkSnapshot{{At: time.Now(), Nodes: []string{"49616"}}}
-	connected, _, _ := buildLinkTables(nil, snaps)
+	snaps := []LinkSnapshot{{At: time.Now(), Nodes: []string{"49616"}}}
+	connected, _, _ := BuildLinkTables(nil, snaps)
 	if got := connected[0].Nodes[0]; got.Number != "49616" || got.Callsign != "" {
 		t.Errorf("got %+v, want bare number", got)
 	}
@@ -97,8 +97,8 @@ func TestBuildLinkTablesNilDirectory(t *testing.T) {
 // empty description must fall back to the callsign, and Detail must not
 // begin with a stray separator.
 func TestBuildLinkTablesEmptyDescription(t *testing.T) {
-	snaps := []linkSnapshot{{At: time.Now(), Nodes: []string{"52829"}}}
-	connected, _, _ := buildLinkTables(realDirectory, snaps)
+	snaps := []LinkSnapshot{{At: time.Now(), Nodes: []string{"52829"}}}
+	connected, _, _ := BuildLinkTables(realDirectory, snaps)
 	n := connected[0].Nodes[0]
 	if n.Callsign != "NA4WX" {
 		t.Errorf("Callsign = %q, want NA4WX", n.Callsign)

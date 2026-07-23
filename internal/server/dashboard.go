@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/rptstatus"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -75,18 +76,18 @@ type nodeQuickStatus struct {
 	MissingDevice *radioChannelRef
 
 	// The two history tables shown for this node, newest first — see
-	// buildLinkTables. ActivityHeaders is taken from app_rpt's own output
-	// rather than named here, so a different app_rpt version's columns
-	// still render correctly.
-	ConnectedHistory []connectedRecord
+	// rptstatus.BuildLinkTables. ActivityHeaders is taken from app_rpt's
+	// own output rather than named here, so a different app_rpt
+	// version's columns still render correctly.
+	ConnectedHistory []rptstatus.ConnectedRecord
 	ActivityHeaders  []string
-	ActivityHistory  []activityRecord
+	ActivityHistory  []rptstatus.ActivityRecord
 
 	// Live state from "rpt stats". Receiving means someone is keying
-	// this node's receiver right now; see nodeReceiving for what that
-	// does and doesn't cover. StatsRaw is shown instead of the table
-	// when the output didn't parse.
-	Stats     statFields
+	// this node's receiver right now; see rptstatus.NodeReceiving for
+	// what that does and doesn't cover. StatsRaw is shown instead of the
+	// table when the output didn't parse.
+	Stats     rptstatus.StatFields
 	StatsOK   bool
 	StatsRaw  string
 	StatsErr  string
@@ -96,7 +97,7 @@ type nodeQuickStatus struct {
 	// the same data as the newest history row, surfaced separately so
 	// the live card doesn't make the reader parse a table to answer
 	// "who is on right now".
-	NowConnected []connectedNode
+	NowConnected []rptstatus.ConnectedNode
 }
 
 type homePageData struct {
@@ -198,7 +199,7 @@ func (s *Server) gatherNodeStatuses(r *http.Request) ([]*config.Node, system.Sta
 		if q.ConnectedErr == "" {
 			s.history.record(node.Number, q.Connected, q.Activity)
 		}
-		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.nodes, s.history.forNode(node.Number))
+		q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = rptstatus.BuildLinkTables(s.nodes, s.history.forNode(node.Number))
 
 		// Live state, for Home's "Right now" card and the Stats page's
 		// detailed field table.
@@ -206,11 +207,11 @@ func (s *Server) gatherNodeStatuses(r *http.Request) ([]*config.Node, system.Sta
 			q.StatsErr = err.Error()
 		} else {
 			q.StatsRaw = out
-			q.Stats, q.StatsOK = parseRptStats(out)
-			q.Receiving = nodeReceiving(q.Stats)
+			q.Stats, q.StatsOK = rptstatus.ParseRptStats(out)
+			q.Receiving = rptstatus.NodeReceiving(q.Stats)
 		}
-		for _, number := range parseConnectedNodes(q.Connected) {
-			q.NowConnected = append(q.NowConnected, describeNode(s.nodes, number))
+		for _, number := range rptstatus.ParseConnectedNodes(q.Connected) {
+			q.NowConnected = append(q.NowConnected, rptstatus.DescribeNode(s.nodes, number))
 		}
 		// Mark which connected nodes are keying right now (RPT_ALINKS) —
 		// the same live read the SSE stream uses, so the page-load

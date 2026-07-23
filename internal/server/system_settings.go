@@ -39,6 +39,13 @@ type systemPageData struct {
 	SA818Last       *sa818.LastApplied
 	CTCSSOptions    []ctcssOption
 
+	// Cloud Sync: this node's optional, off-by-default connection to the
+	// public cloud platform — see internal/cloudagent's package doc and
+	// populateSystemCloud.
+	CloudURL     string
+	CloudAPIKey  string
+	CloudEnabled bool
+
 	// EmptyRadioFiles lists usbradio.conf/simpleusb.conf files with zero
 	// devices defined at all, regardless of whether any node actually
 	// uses that driver. Found the hard way: this HamVoIP/Asterisk 1.4
@@ -108,6 +115,8 @@ func (s *Server) renderSystemPage(w http.ResponseWriter, r *http.Request, pd pag
 		}
 	}
 	data.CTCSSOptions = ctcssOptions()
+
+	s.populateSystemCloud(&data)
 
 	s.render(w, "system.html", data)
 }

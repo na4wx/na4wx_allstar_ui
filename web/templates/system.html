@@ -308,6 +308,35 @@
 </div>
 
 <div class="card">
+  <div class="label-row">
+    <h2 style="margin:0">Cloud Sync</h2>
+    {{template "help" "Optional: connect this node to the public cloud platform so it can be managed remotely, e.g. from another location. This node always dials out to the cloud URL below — it never opens any port for the cloud to reach in, so nothing needs forwarding on your router. Off by default; nothing is sent anywhere until you enable it here with an API key generated on the cloud site."}}
+  </div>
+  <form method="post" action="/system/cloud">
+    <div class="row">
+      <div class="field">
+        <label for="cloud_enabled">Cloud Sync</label>
+        <select id="cloud_enabled" name="cloud_enabled">
+          <option value="true" {{if .CloudEnabled}}selected{{end}}>On</option>
+          <option value="false" {{if not .CloudEnabled}}selected{{end}}>Off</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cloud_url">Cloud URL</label>
+        <input type="text" id="cloud_url" name="cloud_url" value="{{.CloudURL}}" placeholder="wss://your-cloud-site/agent">
+      </div>
+      <div class="field">
+        <label for="cloud_api_key">API key</label>
+        <input type="password" id="cloud_api_key" name="cloud_api_key" value="{{.CloudAPIKey}}" placeholder="generated on the cloud site">
+      </div>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Save Cloud Sync settings</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
   <h2>Change your password</h2>
   <form method="post" action="/system/password">
     <div class="field">

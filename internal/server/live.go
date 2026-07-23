@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"hamvoipconfiggui/internal/config"
+	"hamvoipconfiggui/internal/rptstatus"
 	"hamvoipconfiggui/internal/system"
 )
 
@@ -34,9 +35,9 @@ const liveKeepalive = 25 * time.Second
 // value (shown in the stats table, kept in sync with the pill), and the
 // currently connected nodes with their keyed flags.
 type liveNodeState struct {
-	Receiving     bool            `json:"receiving"`
-	SignalOnInput string          `json:"signalOnInput"`
-	Connected     []connectedNode `json:"connected"`
+	Receiving     bool                      `json:"receiving"`
+	SignalOnInput string                    `json:"signalOnInput"`
+	Connected     []rptstatus.ConnectedNode `json:"connected"`
 }
 
 // snapshotNode reads everything the live stream pushes in one pass: the
@@ -51,14 +52,14 @@ type liveNodeState struct {
 func (s *Server) snapshotNode(ctx context.Context, number string) (liveNodeState, string) {
 	var live liveNodeState
 	if out, err := system.AsteriskRX(ctx, s.asteriskBin, "rpt stats "+number); err == nil {
-		fields, _ := parseRptStats(out)
-		live.Receiving = nodeReceiving(fields)
+		fields, _ := rptstatus.ParseRptStats(out)
+		live.Receiving = rptstatus.NodeReceiving(fields)
 		live.SignalOnInput = fields.Value("Signal on input")
 	}
 
 	nodesOut, _ := system.AsteriskRX(ctx, s.asteriskBin, "rpt nodes "+number)
-	for _, num := range parseConnectedNodes(nodesOut) {
-		live.Connected = append(live.Connected, describeNode(s.nodes, num))
+	for _, num := range rptstatus.ParseConnectedNodes(nodesOut) {
+		live.Connected = append(live.Connected, rptstatus.DescribeNode(s.nodes, num))
 	}
 	s.markKeyed(ctx, number, live.Connected)
 
@@ -66,7 +67,7 @@ func (s *Server) snapshotNode(ctx context.Context, number string) (liveNodeState
 	s.history.record(number, nodesOut, activityOut)
 
 	q := nodeQuickStatus{Node: &config.Node{Number: number}}
-	q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = buildLinkTables(s.nodes, s.history.forNode(number))
+	q.ConnectedHistory, q.ActivityHeaders, q.ActivityHistory = rptstatus.BuildLinkTables(s.nodes, s.history.forNode(number))
 	return live, s.renderHistoryFragment(q)
 }
 
@@ -88,10 +89,11 @@ func (s *Server) renderHistoryFragment(q nodeQuickStatus) string {
 }
 
 // markKeyed flags which of connected are transmitting right now, from
-// app_rpt's RPT_ALINKS (see keyedNodes). Best-effort and additive: on a
-// build without that variable, nothing is marked. Skipped entirely when
-// nothing is connected, so an idle node makes no extra CLI call.
-func (s *Server) markKeyed(ctx context.Context, number string, connected []connectedNode) {
+// app_rpt's RPT_ALINKS (see rptstatus.KeyedNodes). Best-effort and
+// additive: on a build without that variable, nothing is marked.
+// Skipped entirely when nothing is connected, so an idle node makes no
+// extra CLI call.
+func (s *Server) markKeyed(ctx context.Context, number string, connected []rptstatus.ConnectedNode) {
 	if len(connected) == 0 {
 		return
 	}
@@ -99,7 +101,7 @@ func (s *Server) markKeyed(ctx context.Context, number string, connected []conne
 	if err != nil {
 		return
 	}
-	keyed := keyedNodes(out)
+	keyed := rptstatus.KeyedNodes(out)
 	for i := range connected {
 		if keyed[connected[i].Number] {
 			connected[i].Keyed = true

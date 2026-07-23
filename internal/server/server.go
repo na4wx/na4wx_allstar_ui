@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"hamvoipconfiggui/internal/auth"
+	"hamvoipconfiggui/internal/cloudagent"
 	"hamvoipconfiggui/internal/config"
 	"hamvoipconfiggui/internal/nodedb"
 	"hamvoipconfiggui/internal/sounds"
@@ -76,6 +77,16 @@ type Server struct {
 	// mappings — see internal/wxtone's package doc. Always non-nil.
 	wxTones *wxtone.Store
 
+	// cloudAgent is this node's optional, off-by-default connection to
+	// the public cloud platform — see internal/cloudagent's package
+	// doc. Always non-nil; whether it actually dials out at all is
+	// controlled by cloudAgent.Settings()'s own Enabled flag, checked by
+	// (*cloudagent.Agent).Run itself, not by anything here. cloudURLDefault
+	// only pre-fills the Cloud Sync settings form when nothing has been
+	// saved yet — see -cloud-url in main.go.
+	cloudAgent      *cloudagent.Agent
+	cloudURLDefault string
+
 	// restartNeeded tracks whether any Asterisk config file has been
 	// saved since Asterisk was last (re)started — set via
 	// config.Store.SetChangeHook (every save is to an Asterisk/app_rpt
@@ -91,6 +102,17 @@ type Server struct {
 
 // NodeDB exposes the node directory so main can start its refresh loop.
 func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
+
+// StartCloudAgent begins this node's optional, off-by-default outbound
+// connection to the public cloud platform (see internal/cloudagent's
+// package doc) — a supervised goroutine with its own reconnect/backoff
+// lifecycle, not a time.Ticker poller like StartLinkHistoryPoller/
+// StartSoundSchedulePoller/StartWXTonePoller, but started the same way:
+// once, from main, for the life of the process. A no-op until the
+// operator opts in on the Cloud Sync settings card.
+func (s *Server) StartCloudAgent(ctx context.Context) {
+	go s.cloudAgent.Run(ctx)
+}
 
 // New builds a Server. templatesFS should contain web/templates and
 // staticFS should contain web/static (both typically embed.FS values
@@ -118,9 +140,12 @@ func (s *Server) NodeDB() *nodedb.Store { return s.nodes }
 // an operator-installed copy of SkywarnPlus lives — see
 // internal/skywarnplus's package doc. wxTonesPath is where the
 // operator's own alert-driven courtesy-tone mappings are persisted —
-// see internal/wxtone's package doc.
-func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir, wxTonesPath string) (*Server, error) {
-	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath), ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir, wxTones: wxtone.New(wxTonesPath)}
+// see internal/wxtone's package doc. cloudSettingsPath is where this
+// node's cloud API key/URL/enabled flag are persisted, and cloudURLDefault
+// pre-fills the Cloud Sync settings form the first time it's opened —
+// see internal/cloudagent's package doc.
+func New(store *config.Store, authMgr *auth.Manager, templatesFS, staticFS fs.FS, asteriskBin, asteriskLog, sa818Tool, sa818StatePath, nodeDBPath, nodeDBURL, soundsCustomDir, soundsStockDir, soxTool, soundSchedulePath, ttsTool, ttsVoicesDir, skywarnDir, wxTonesPath, cloudSettingsPath, cloudURLDefault string) (*Server, error) {
+	s := &Server{store: store, auth: authMgr, mux: http.NewServeMux(), asteriskBin: asteriskBin, asteriskLog: asteriskLog, sa818Tool: sa818Tool, sa818StatePath: sa818StatePath, history: newLinkHistory(), nodes: nodedb.New(nodeDBPath, nodeDBURL), sounds: sounds.New(soundsCustomDir, soundsStockDir, soxTool), soundSchedule: soundschedule.New(soundSchedulePath), ttsTool: ttsTool, ttsVoicesDir: ttsVoicesDir, skywarnDir: skywarnDir, wxTones: wxtone.New(wxTonesPath), cloudAgent: cloudagent.New(cloudSettingsPath, store, asteriskBin), cloudURLDefault: cloudURLDefault}
 	s.live = newLiveHub(s)
 	store.SetChangeHook(func(string) { s.restartNeeded.Store(true) })
 
@@ -226,6 +251,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("POST /system/restart-asterisk", s.requireAuth(s.handleSystemRestartAsterisk))
 	s.mux.HandleFunc("POST /system/apply-restart", s.requireAuth(s.handleApplyRestart))
 	s.mux.HandleFunc("POST /system/reboot", s.requireAuth(s.handleSystemReboot))
+	s.mux.HandleFunc("POST /system/cloud", s.requireAuth(s.handleSystemCloudSave))
 	// Radio device editing (adjusting an already-created device) — device
 	// *creation* only happens inline from a node's own page now.
 	s.mux.HandleFunc("GET /system/radio/{file}/{name}", s.requireAuth(s.handleRadioEditForm))
