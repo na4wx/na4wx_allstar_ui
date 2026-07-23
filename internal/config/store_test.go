@@ -71,6 +71,12 @@ func TestListNodesOnMissingRptConf(t *testing.T) {
 	if len(nodes) != 0 {
 		t.Fatalf("expected no nodes, got %v", nodes)
 	}
+	// Non-nil even with zero nodes -- a nil slice marshals to JSON
+	// null, and the cloud relay's config.listNodes action sends this
+	// straight to the browser as JSON.
+	if nodes == nil {
+		t.Error("ListNodes() = nil, want a non-nil empty slice")
+	}
 }
 
 // TestChangeHookFiresOnSave covers the mechanism the server package uses

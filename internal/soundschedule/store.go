@@ -145,7 +145,10 @@ func (s *Store) ListForNode(node string) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []Entry
+	// Non-nil even with zero matches -- see config.Store.ListNodes's
+	// identical comment; the cloud relay's soundSchedule.list action
+	// sends this straight to the browser as JSON.
+	out := []Entry{}
 	for _, e := range entries {
 		if e.Node == node {
 			out = append(out, e)

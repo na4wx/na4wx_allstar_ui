@@ -123,6 +123,27 @@ func TestListForNode(t *testing.T) {
 	}
 }
 
+// TestListForNodeNoMatchesIsNonNil confirms a node with zero scheduled
+// entries gets back a non-nil empty slice, not nil -- a nil slice
+// marshals to JSON null, and the cloud relay's soundSchedule.list
+// action sends this straight to the browser as JSON.
+func TestListForNodeNoMatchesIsNonNil(t *testing.T) {
+	s := New(newTestStorePath(t))
+	if err := s.Save(Entry{Node: "3000", File: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := s.ListForNode("2000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entries == nil {
+		t.Error("ListForNode() = nil, want a non-nil empty slice")
+	}
+	if len(entries) != 0 {
+		t.Errorf("ListForNode() = %v, want empty", entries)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	s := New(newTestStorePath(t))
 	if err := s.Save(Entry{Node: "2000", File: "a"}); err != nil {

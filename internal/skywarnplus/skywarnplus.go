@@ -174,6 +174,17 @@ func GetStatus(ctx context.Context, dir string) (Status, error) {
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
 		return Status{}, fmt.Errorf("parse sky_configure.py status output: %w", err)
 	}
+	// A station with none configured gets back JSON null (or an
+	// omitted key) for these, which json.Unmarshal leaves as a nil Go
+	// slice -- re-marshaled as null again by the cloud relay's
+	// skywarn.getStatus action, which the browser expects to always be
+	// able to call .length/.map on.
+	if raw.CountyCodes == nil {
+		raw.CountyCodes = []string{}
+	}
+	if raw.Nodes == nil {
+		raw.Nodes = []string{}
+	}
 	return Status{
 		Enable:                  raw.Enable,
 		SayAlert:                raw.SayAlert,

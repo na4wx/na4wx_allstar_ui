@@ -134,6 +134,27 @@ func TestListForNode(t *testing.T) {
 	}
 }
 
+// TestListForNodeNoMatchesIsNonNil confirms a node with zero WX tone
+// mappings gets back a non-nil empty slice, not nil -- a nil slice
+// marshals to JSON null, and the cloud relay's wxTone.list action
+// sends this straight to the browser as JSON.
+func TestListForNodeNoMatchesIsNonNil(t *testing.T) {
+	s := New(newTestStorePath(t))
+	if err := s.Save(Entry{Node: "3000", CTKey: "ct2"}); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := s.ListForNode("2000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entries == nil {
+		t.Error("ListForNode() = nil, want a non-nil empty slice")
+	}
+	if len(entries) != 0 {
+		t.Errorf("ListForNode() = %v, want empty", entries)
+	}
+}
+
 func TestSetMode(t *testing.T) {
 	s := New(newTestStorePath(t))
 	if err := s.Save(Entry{Node: "2000", CTKey: "ct1"}); err != nil {

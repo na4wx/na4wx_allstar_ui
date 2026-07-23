@@ -43,7 +43,13 @@ type liveNodeState struct {
 // gracefully to a bare number, same as the local app before its node
 // directory has been downloaded).
 func (a *Agent) snapshotLiveNode(ctx context.Context, number string) liveNodeState {
-	var live liveNodeState
+	// Connected starts as a non-nil empty slice, not the zero value --
+	// a nil slice encodes to JSON as null, and the cloud client renders
+	// this straight off the wire (see docs/PROTOCOL.md's nodeLive event)
+	// expecting an array it can always call .length/.map on. A node
+	// with nothing currently connected is an extremely common, everyday
+	// state, not an edge case, so this must never come across as null.
+	live := liveNodeState{Connected: []rptstatus.ConnectedNode{}}
 	if out, err := system.AsteriskRX(ctx, a.asteriskBin, "rpt stats "+number); err == nil {
 		fields, _ := rptstatus.ParseRptStats(out)
 		live.Receiving = rptstatus.NodeReceiving(fields)

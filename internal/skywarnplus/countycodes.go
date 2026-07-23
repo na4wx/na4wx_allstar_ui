@@ -53,7 +53,11 @@ func ListCounties() []CountyOption {
 // position, so the parser doesn't depend on exact formatting details
 // that could shift between file versions.
 func parseCountyCodes(md string) []CountyOption {
-	var out []CountyOption
+	// Non-nil even with zero matches -- this is always non-empty in
+	// practice (bundled reference data), but ListCounties()'s result
+	// reaches the cloud relay's skywarn.listCounties action as JSON, so
+	// keep the same guarantee as every other list-returning action.
+	out := []CountyOption{}
 	state := ""
 	for _, line := range strings.Split(md, "\n") {
 		line = strings.TrimRight(line, "\r")

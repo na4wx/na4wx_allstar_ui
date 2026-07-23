@@ -130,7 +130,12 @@ func (s *Store) ListNodes() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	// Non-nil even with zero matches: a nil []string marshals to JSON
+	// null, and the cloud relay's config.listNodes action sends this
+	// straight to the browser, which expects to always call
+	// .length/.map on it -- a device with no nodes yet is a normal
+	// state, not an error.
+	out := []string{}
 	for _, sec := range f.Sections() {
 		if nodeSectionRe.MatchString(sec) {
 			out = append(out, sec)

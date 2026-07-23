@@ -76,9 +76,14 @@ func (a *Agent) actionRawConfigGetFile(_ context.Context, params json.RawMessage
 	if err != nil {
 		return nil, err
 	}
-	result := rawConfigFileResult{}
+	// Both Sections and each section's Keys stay non-nil even with zero
+	// entries -- a nil Go slice marshals to JSON null, and the browser
+	// expects to always call .length/.map on both (see live.go's
+	// snapshotLiveNode for the exact same bug, already found and fixed
+	// once in this package).
+	result := rawConfigFileResult{Sections: []rawConfigSection{}}
 	for _, sec := range f.Sections() {
-		var keys []rawConfigKV
+		keys := []rawConfigKV{}
 		for _, kv := range f.SectionKeys(sec) {
 			keys = append(keys, rawConfigKV{Key: kv.Key, Value: kv.Value})
 		}

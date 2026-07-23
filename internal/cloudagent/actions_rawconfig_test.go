@@ -74,6 +74,41 @@ func TestActionRawConfigGetFileWhenEnabled(t *testing.T) {
 	}
 }
 
+// TestActionRawConfigGetFileSectionWithNoKeysIsNonNil confirms a
+// section with zero key/value lines gets back a non-nil empty Keys
+// slice, not nil -- a nil slice marshals to JSON null, and this result
+// goes straight to the browser as JSON.
+func TestActionRawConfigGetFileSectionWithNoKeysIsNonNil(t *testing.T) {
+	asteriskDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(asteriskDir, config.RptConfFile), []byte("[2000]\n"), 0644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	store := config.NewStore(asteriskDir)
+	a := newTestAgent(t, filepath.Join(t.TempDir(), "settings.json"), store, "asterisk")
+	if err := a.Settings().Save(Settings{Enabled: true, AllowRawConfigEdit: true}); err != nil {
+		t.Fatal(err)
+	}
+
+	params, _ := json.Marshal(map[string]string{"file": "rpt.conf"})
+	result, err := a.dispatch(context.Background(), "rawconfig.getFile", params)
+	if err != nil {
+		t.Fatalf("dispatch error = %v", err)
+	}
+	fileResult, ok := result.(rawConfigFileResult)
+	if !ok {
+		t.Fatalf("result type = %T, want rawConfigFileResult", result)
+	}
+	if len(fileResult.Sections) != 1 {
+		t.Fatalf("sections = %+v, want exactly one", fileResult.Sections)
+	}
+	if fileResult.Sections[0].Keys == nil {
+		t.Error("Sections[0].Keys = nil, want a non-nil empty slice")
+	}
+	if len(fileResult.Sections[0].Keys) != 0 {
+		t.Errorf("Sections[0].Keys = %+v, want empty", fileResult.Sections[0].Keys)
+	}
+}
+
 func TestActionRawConfigSetKeyRefusedWhenDisabled(t *testing.T) {
 	a := newRawConfigTestAgent(t, false)
 	params, _ := json.Marshal(rawConfigSetKeyParams{File: "rpt.conf", Section: "2000", Index: 1, Value: "3"})

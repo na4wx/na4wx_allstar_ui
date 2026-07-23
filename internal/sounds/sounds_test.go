@@ -99,8 +99,14 @@ func TestListCustomMissingDirIsNotAnError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCustom() error = %v, want nil for a missing directory", err)
 	}
-	if files != nil {
-		t.Errorf("got %v, want nil", files)
+	// Non-nil (an empty slice, not nil) even for a missing directory --
+	// a nil slice would marshal to JSON null, and the cloud relay's
+	// sounds.listAll action sends this straight to the browser.
+	if files == nil {
+		t.Error("got nil, want a non-nil empty slice")
+	}
+	if len(files) != 0 {
+		t.Errorf("got %v, want empty", files)
 	}
 }
 

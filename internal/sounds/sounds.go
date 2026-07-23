@@ -105,15 +105,19 @@ func New(customDir, stockDir, soxTool string) *Store {
 // full path built from dir itself, not a fixed string (see File.Ref's
 // doc comment).
 func listDir(dir string, custom bool, refFor func(name string) string) ([]File, error) {
+	// Non-nil even with zero results (missing dir, or nothing
+	// recognized in it) -- ListAll's result reaches the cloud relay's
+	// sounds.listAll action, sent straight to the browser as JSON,
+	// which expects to always call .length/.map on it.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return []File{}, nil
 		}
 		return nil, err
 	}
 	seen := make(map[string]bool)
-	var out []File
+	out := []File{}
 	for _, e := range entries {
 		if e.IsDir() {
 			continue

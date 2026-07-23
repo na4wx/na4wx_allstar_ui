@@ -2,6 +2,8 @@ package cloudagent
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +12,31 @@ import (
 
 	"hamvoipconfiggui/internal/config"
 )
+
+// TestSnapshotLiveNodeConnectedNeverMarshalsToNull covers a real crash:
+// a nil Go slice marshals to JSON null, and the cloud client's
+// live.connected.length crashed the browser tab on exactly that --
+// "nothing connected right now" (asteriskBin missing here reproduces
+// that same "no connections found" path) is an everyday state, not an
+// error, and must always come across the wire as [], never null.
+func TestSnapshotLiveNodeConnectedNeverMarshalsToNull(t *testing.T) {
+	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary")
+	live := a.snapshotLiveNode(context.Background(), "2000")
+
+	if live.Connected == nil {
+		t.Fatal("live.Connected is nil, want a non-nil (possibly empty) slice")
+	}
+	data, err := json.Marshal(live)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	if strings.Contains(string(data), `"connected":null`) {
+		t.Errorf("marshaled JSON contains \"connected\":null: %s", data)
+	}
+	if !strings.Contains(string(data), `"connected":[]`) {
+		t.Errorf("marshaled JSON missing \"connected\":[]: %s", data)
+	}
+}
 
 // TestWatchStartsPushingLiveEvents confirms a "watch" envelope actually
 // starts a poller that pushes "event"/"nodeLive" data for that node,

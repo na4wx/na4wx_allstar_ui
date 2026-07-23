@@ -84,6 +84,32 @@ func TestGetStatusSuccess(t *testing.T) {
 	}
 }
 
+// TestGetStatusNoCountiesOrNodesIsNonNil confirms a station with
+// neither county codes nor registered nodes configured -- where
+// sky_configure.py's own JSON omits (or sends null for) those fields --
+// gets back non-nil empty slices, not nil. A nil slice marshals to
+// JSON null again, and the cloud relay's skywarn.getStatus action sends
+// this straight to the browser as JSON.
+func TestGetStatusNoCountiesOrNodesIsNonNil(t *testing.T) {
+	fakePython3(t, true, `{"enable":true,"countycodes":null,"pushover":{},"skydescribe":{}}`, "")
+	status, err := GetStatus(context.Background(), "/unused/dir")
+	if err != nil {
+		t.Fatalf("GetStatus() error = %v", err)
+	}
+	if status.CountyCodes == nil {
+		t.Error("CountyCodes = nil, want a non-nil empty slice")
+	}
+	if len(status.CountyCodes) != 0 {
+		t.Errorf("CountyCodes = %v, want empty", status.CountyCodes)
+	}
+	if status.Nodes == nil {
+		t.Error("Nodes = nil, want a non-nil empty slice")
+	}
+	if len(status.Nodes) != 0 {
+		t.Errorf("Nodes = %v, want empty", status.Nodes)
+	}
+}
+
 func TestGetStatusToolFailure(t *testing.T) {
 	fakePython3(t, false, "", "config.yaml not found")
 	_, err := GetStatus(context.Background(), "/unused/dir")
