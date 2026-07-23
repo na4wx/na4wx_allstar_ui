@@ -71,6 +71,7 @@ const (
 // life of the process.
 type Agent struct {
 	settings       *SettingsStore
+	cloudURL       string // fixed at construction; never operator-editable, see New's doc comment
 	store          *config.Store
 	asteriskBin    string
 	live           *liveWatches
@@ -88,16 +89,22 @@ type Agent struct {
 	lastConnected time.Time       // zero until the first successful helloAck
 }
 
-// New builds an Agent. settingsPath is where the operator's API
-// key/cloud URL/enabled flag are persisted (see SettingsStore); every
-// dependency through sa818StatePath is the exact same one (often the
-// exact same *Store instance) internal/server.New already constructs,
-// passed through rather than built twice — see
+// New builds an Agent. settingsPath is where the operator's API key
+// and enabled flag are persisted (see SettingsStore). cloudURL is the
+// one address this Agent will ever dial — fixed at build/deploy time
+// (see cmd/hamvoip-gui/main.go's -cloud-url flag), never read from the
+// operator-facing settings form or the settings file on disk: an
+// operator can point their own API key at the wrong place by typo, but
+// they can't point this binary at an arbitrary WebSocket endpoint.
+// Every dependency through sa818StatePath is the exact same one (often
+// the exact same *Store instance) internal/server.New already
+// constructs, passed through rather than built twice — see
 // (*server.Server).StartCloudAgent. auditLogPath is where every
 // dispatched action is independently recorded (see audit.go); an empty
 // path disables audit logging entirely.
 func New(
 	settingsPath string,
+	cloudURL string,
 	store *config.Store,
 	asteriskBin string,
 	soundsStore *sounds.Store,
@@ -110,6 +117,7 @@ func New(
 ) *Agent {
 	return &Agent{
 		settings:       NewSettingsStore(settingsPath),
+		cloudURL:       cloudURL,
 		store:          store,
 		asteriskBin:    asteriskBin,
 		live:           newLiveWatches(),
@@ -166,12 +174,12 @@ func (a *Agent) setActiveConn(conn *websocket.Conn) {
 	a.activeConn = conn
 }
 
-// Run dials out to the configured cloud URL and services it until ctx
-// is cancelled, reconnecting with exponential backoff (full jitter) on
-// any failure. Never listens for or accepts inbound connections — the
-// entire point of this design is that the node is reachable behind home
-// NAT without any port forwarding, so this only ever dials out. Call
-// once, from (*Server).StartCloudAgent.
+// Run dials out to the fixed cloud URL (see New's doc comment) and
+// services it until ctx is cancelled, reconnecting with exponential
+// backoff (full jitter) on any failure. Never listens for or accepts
+// inbound connections — the entire point of this design is that the
+// node is reachable behind home NAT without any port forwarding, so
+// this only ever dials out. Call once, from (*Server).StartCloudAgent.
 func (a *Agent) Run(ctx context.Context) {
 	backoff := time.Duration(initialBackoff)
 	for {
@@ -179,12 +187,15 @@ func (a *Agent) Run(ctx context.Context) {
 			return
 		}
 		settings, err := a.settings.Load()
-		if err != nil || !settings.Enabled || settings.APIKey == "" || settings.CloudURL == "" {
+		if err != nil || !settings.Enabled || settings.APIKey == "" || a.cloudURL == "" {
 			if !a.wait(ctx, disabledPollInterval) {
 				return
 			}
 			continue
 		}
+		// Always the Agent's own fixed URL, never whatever a
+		// settings.json on disk might contain — see New's doc comment.
+		settings.CloudURL = a.cloudURL
 
 		if a.runOnce(ctx, settings) {
 			backoff = initialBackoff

@@ -50,7 +50,7 @@ func TestRunSkipsConnectingWhenDisabled(t *testing.T) {
 	a := newTestAgent(t, t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
-	a.Run(ctx) // Settings default to zero value (Enabled: false) -- must return via ctx timeout, not hang or panic on a nil/empty CloudURL dial.
+	a.Run(ctx) // Settings default to zero value (Enabled: false) -- must return via ctx timeout, not hang or panic, without ever attempting a dial.
 }
 
 // TestReloadWakesWaitEarly confirms Reload actually shortens the wait

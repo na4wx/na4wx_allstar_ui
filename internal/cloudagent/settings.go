@@ -8,14 +8,21 @@ import (
 )
 
 // Settings is the operator's own opt-in configuration for connecting
-// this node to the public cloud platform: which server to dial, the
-// API key that identifies this device, and whether the connection is
-// enabled at all. Unlike internal/wxtone or internal/soundschedule
-// (which persist a list of entries), there is exactly one Settings
-// value per installation, so SettingsStore holds a single JSON object
-// rather than an array.
+// this node to the public cloud platform: the API key that identifies
+// this device, and whether the connection is enabled at all. Unlike
+// internal/wxtone or internal/soundschedule (which persist a list of
+// entries), there is exactly one Settings value per installation, so
+// SettingsStore holds a single JSON object rather than an array.
 type Settings struct {
-	CloudURL string `json:"cloud_url"`
+	// CloudURL is deliberately never persisted by SettingsStore or read
+	// from the operator-facing form (see internal/server/cloudsettings.go)
+	// -- Run always overwrites it with Agent.cloudURL (the fixed URL
+	// baked in at build/deploy time via -cloud-url) right before
+	// dialing, regardless of whatever a settings.json on disk might
+	// contain. It stays a field here only because runOnce's own tests
+	// exercise it directly against a fake local server, bypassing Run
+	// entirely.
+	CloudURL string `json:"-"`
 	APIKey   string `json:"api_key"`
 	Enabled  bool   `json:"enabled"`
 

@@ -16,7 +16,7 @@ func newCloudTestServer(t *testing.T, cloudURLDefault string) *Server {
 	settingsPath := filepath.Join(t.TempDir(), "cloud-agent.json")
 	store := config.NewStore(t.TempDir())
 	agent := cloudagent.New(
-		settingsPath, store, "asterisk",
+		settingsPath, cloudURLDefault, store, "asterisk",
 		sounds.New(t.TempDir(), t.TempDir(), "sox"),
 		soundschedule.New(filepath.Join(t.TempDir(), "sound-schedule.json")),
 		wxtone.New(filepath.Join(t.TempDir(), "wx-tones.json")),
@@ -31,10 +31,10 @@ func newCloudTestServer(t *testing.T, cloudURLDefault string) *Server {
 }
 
 // TestPopulateSystemCloudUsesDefaultWhenUnconfigured covers a fresh
-// install: nothing has been saved yet, so the form should pre-fill with
-// this server's configured default cloud URL (see -cloud-url in
-// main.go) rather than showing a blank field, while Enabled/APIKey stay
-// their honest zero values.
+// install: nothing has been saved yet, so the Cloud Sync card should
+// show this server's fixed cloud URL (see -cloud-url in main.go)
+// rather than a blank field, while Enabled/APIKey stay their honest
+// zero values.
 func TestPopulateSystemCloudUsesDefaultWhenUnconfigured(t *testing.T) {
 	s := newCloudTestServer(t, "wss://cloud.example.com/agent")
 	var data systemPageData
@@ -51,13 +51,16 @@ func TestPopulateSystemCloudUsesDefaultWhenUnconfigured(t *testing.T) {
 	}
 }
 
-// TestPopulateSystemCloudPrefersSavedURLOverDefault confirms an
-// operator's own saved URL is never silently overwritten by this
-// server's default once something real has been saved.
-func TestPopulateSystemCloudPrefersSavedURLOverDefault(t *testing.T) {
-	s := newCloudTestServer(t, "wss://default.example.com/agent")
+// TestPopulateSystemCloudAlwaysUsesFixedURL confirms the Cloud URL
+// shown is always this server's fixed cloudURLDefault, never anything
+// that might be sitting in the settings file on disk (e.g. from a
+// hand-edited file, or a value saved before CloudURL stopped being
+// persisted at all) -- the cloud address is baked in at build/deploy
+// time, not operator-editable.
+func TestPopulateSystemCloudAlwaysUsesFixedURL(t *testing.T) {
+	s := newCloudTestServer(t, "wss://fixed.example.com/agent")
 	if err := s.cloudAgent.Settings().Save(cloudagent.Settings{
-		CloudURL: "wss://operators-own-cloud.example.com/agent",
+		CloudURL: "wss://should-be-ignored.example.com/agent",
 		APIKey:   "hvc_live_abc123",
 		Enabled:  true,
 	}); err != nil {
@@ -67,8 +70,8 @@ func TestPopulateSystemCloudPrefersSavedURLOverDefault(t *testing.T) {
 	var data systemPageData
 	s.populateSystemCloud(&data)
 
-	if data.CloudURL != "wss://operators-own-cloud.example.com/agent" {
-		t.Errorf("CloudURL = %q, want the operator's saved URL, not the default", data.CloudURL)
+	if data.CloudURL != "wss://fixed.example.com/agent" {
+		t.Errorf("CloudURL = %q, want the server's fixed default regardless of what was saved", data.CloudURL)
 	}
 	if !data.CloudEnabled {
 		t.Error("CloudEnabled = false, want true")

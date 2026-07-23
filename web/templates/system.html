@@ -323,8 +323,11 @@
         </select>
       </div>
       <div class="field">
-        <label for="cloud_url">Cloud URL</label>
-        <input type="text" id="cloud_url" name="cloud_url" value="{{.CloudURL}}" placeholder="wss://your-cloud-site/agent">
+        <div class="label-row">
+          <label for="cloud_url">Cloud URL</label>
+          {{template "help" "Fixed for this build of the app -- not editable here, so a mistyped or malicious URL can never redirect this node's cloud connection."}}
+        </div>
+        <input type="text" id="cloud_url" value="{{.CloudURL}}" disabled>
       </div>
       <div class="field">
         <label for="cloud_api_key">API key</label>

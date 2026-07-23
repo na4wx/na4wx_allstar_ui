@@ -51,7 +51,7 @@ func TestAuditWriterAppendsJSONLines(t *testing.T) {
 // both for a recognized action and for an unknown one.
 func TestDispatchWritesAuditEntryPerCall(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cloud-actions.log")
-	a := New(path, config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary", nil, nil, nil, "", "818-prog", "", path)
+	a := New(path, "", config.NewStore(t.TempDir()), "does-not-exist-asterisk-binary", nil, nil, nil, "", "818-prog", "", path)
 
 	if _, err := a.dispatch(context.Background(), "system.status", nil); err != nil {
 		t.Fatalf("dispatch(system.status) error = %v", err)
@@ -84,7 +84,7 @@ func TestDispatchWritesAuditEntryPerCall(t *testing.T) {
 // was present in the params this call actually sent.
 func TestDispatchAuditEntryNeverIncludesParams(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "cloud-actions.log")
-	a := New(path, config.NewStore(t.TempDir()), "asterisk", nil, nil, nil, "", "818-prog", "", path)
+	a := New(path, "", config.NewStore(t.TempDir()), "asterisk", nil, nil, nil, "", "818-prog", "", path)
 
 	const secret = "supersecretpushovertoken123"
 	params := []byte(`{"enable":true,"userKey":"u","apiToken":"` + secret + `","debug":false}`)

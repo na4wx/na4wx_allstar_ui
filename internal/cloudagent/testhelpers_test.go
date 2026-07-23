@@ -20,6 +20,7 @@ func newTestAgent(t *testing.T, settingsPath string, store *config.Store, asteri
 	t.Helper()
 	return New(
 		settingsPath,
+		"wss://cloud.example.com/agent", // fixed test cloudURL -- see New's doc comment
 		store,
 		asteriskBin,
 		sounds.New(t.TempDir(), t.TempDir(), "sox"),
