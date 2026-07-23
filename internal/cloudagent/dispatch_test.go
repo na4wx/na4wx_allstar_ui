@@ -21,7 +21,13 @@ func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
 	a := New(t.TempDir()+"/settings.json", config.NewStore(t.TempDir()), "asterisk")
 	got := a.actions()
 
-	want := map[string]bool{"system.status": true}
+	want := map[string]bool{
+		"system.status":     true,
+		"config.listNodes":  true,
+		"config.loadNode":   true,
+		"config.saveNode":   true,
+		"config.deleteNode": true,
+	}
 	if len(got) != len(want) {
 		t.Fatalf("actions() has %d entries, want %d: %v", len(got), len(want), keysOf(got))
 	}

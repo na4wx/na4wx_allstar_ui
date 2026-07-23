@@ -19,7 +19,11 @@ type actionFunc func(ctx context.Context, params json.RawMessage) (any, error)
 // that property matters.
 func (a *Agent) actions() map[string]actionFunc {
 	return map[string]actionFunc{
-		"system.status": a.actionSystemStatus,
+		"system.status":     a.actionSystemStatus,
+		"config.listNodes":  a.actionConfigListNodes,
+		"config.loadNode":   a.actionConfigLoadNode,
+		"config.saveNode":   a.actionConfigSaveNode,
+		"config.deleteNode": a.actionConfigDeleteNode,
 	}
 }
 

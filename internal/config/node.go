@@ -24,8 +24,11 @@ var nodeSectionRe = regexp.MustCompile(`^[0-9]+$`)
 // "register =>" line, i.e. the credentials that connect this node to the
 // wider AllStarLink network) is edited separately via the generic config
 // editor, since its section layout varies more between HamVoIP releases.
+// JSON tags below exist only for internal/cloudagent's relayed config
+// actions (see that package's actions_config.go) — they have no effect
+// on this struct's existing Go-field-name access from html/template.
 type Node struct {
-	Number string // e.g. "2000"; the per-node section name
+	Number string `json:"number"` // e.g. "2000"; the per-node section name
 
 	// DialString is the raw value of this node's entry in rpt.conf's
 	// [nodes] section, conventionally "radio@host:port/node,NONE" —
@@ -36,20 +39,20 @@ type Node struct {
 	// normal AllStarLink-registered node has no entry there at all —
 	// just its own numbered section. So this is usually empty, and
 	// that's normal, not a sign of a broken node.
-	DialString string
+	DialString string `json:"dialString"`
 
-	RXChannel   string // e.g. "USBRADIO/usb" or "Voter/125"
-	TXChannel   string // usually blank (defaults to RXChannel)
-	Duplex      string // "0".."4"
-	Telemetry   string
-	Morse       string
-	Functions   string
-	Macro       string // which rpt.conf stanza holds this node's saved macros (see the "macro,<n>" function)
-	HangTime    string // ms
-	AltHangTime string // ms
-	TOTime      string // ms, transmit timeout
-	IDTime      string // ms between IDs
-	IDRecording string // sound file/macro used for station ID
+	RXChannel   string `json:"rxChannel"` // e.g. "USBRADIO/usb" or "Voter/125"
+	TXChannel   string `json:"txChannel"` // usually blank (defaults to RXChannel)
+	Duplex      string `json:"duplex"`    // "0".."4"
+	Telemetry   string `json:"telemetry"`
+	Morse       string `json:"morse"`
+	Functions   string `json:"functions"`
+	Macro       string `json:"macro"`       // which rpt.conf stanza holds this node's saved macros (see the "macro,<n>" function)
+	HangTime    string `json:"hangTime"`    // ms
+	AltHangTime string `json:"altHangTime"` // ms
+	TOTime      string `json:"toTime"`      // ms, transmit timeout
+	IDTime      string `json:"idTime"`      // ms between IDs
+	IDRecording string `json:"idRecording"` // sound file/macro used for station ID
 
 	// These three decide WHICH of the telemetry section's ct1-ct8
 	// courtesy tones actually plays in which situation — confirmed
@@ -61,9 +64,9 @@ type Node struct {
 	// for on this specific node, rather than guessing or hardcoding a
 	// universal meaning that could be wrong for a node that assigns
 	// them differently.
-	UnlinkedCT  string // courtesy tone played when not connected to any other node
-	RemoteCT    string // courtesy tone played when a remote base is connected locally
-	LinkUnkeyCT string // courtesy tone played when a connected/linked node unkeys
+	UnlinkedCT  string `json:"unlinkedCT"`  // courtesy tone played when not connected to any other node
+	RemoteCT    string `json:"remoteCT"`    // courtesy tone played when a remote base is connected locally
+	LinkUnkeyCT string `json:"linkUnkeyCT"` // courtesy tone played when a connected/linked node unkeys
 
 	// Scheduler names this node's [scheduleNNNN] section — app_rpt's own
 	// native cron-like mechanism (entries there are "<macro number> = MM
@@ -77,7 +80,7 @@ type Node struct {
 	// the narrow SetNodeScheduler, by the "Automation" tab's own scoped
 	// form, so an ordinary Setup-tab save (which never carries a
 	// "scheduler" field at all) can never blank it out.
-	Scheduler string
+	Scheduler string `json:"scheduler"`
 }
 
 // nodeFields lists the per-node-section keys mapped onto Node, in the
