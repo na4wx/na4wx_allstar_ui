@@ -51,6 +51,41 @@ func TestActionSA818ProgramSuccess(t *testing.T) {
 	}
 }
 
+func TestActionSA818LastNoRecordYet(t *testing.T) {
+	a := New(filepath.Join(t.TempDir(), "settings.json"), "", nil, "asterisk", nil, nil, nil, "",
+		"818-prog", filepath.Join(t.TempDir(), "sa818-last.json"), "")
+
+	result, err := a.dispatch(context.Background(), "sa818.last", nil)
+	if err != nil {
+		t.Fatalf("dispatch error = %v, want nil (a missing state file isn't an error)", err)
+	}
+	if result != nil {
+		t.Errorf("result = %v, want nil when nothing has been sent yet", result)
+	}
+}
+
+func TestActionSA818LastAfterProgram(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "sa818-last.json")
+	a := New(filepath.Join(t.TempDir(), "settings.json"), "", nil, "asterisk", nil, nil, nil, "", fakeSA818Tool(t, "OK"), statePath, "")
+
+	params, _ := json.Marshal(sa818.Settings{TxFreqMHz: "446.1000", RxFreqMHz: "446.1000", Squelch: 5, Volume: 4})
+	if _, err := a.dispatch(context.Background(), "sa818.program", params); err != nil {
+		t.Fatalf("dispatch(sa818.program) error = %v", err)
+	}
+
+	result, err := a.dispatch(context.Background(), "sa818.last", nil)
+	if err != nil {
+		t.Fatalf("dispatch(sa818.last) error = %v", err)
+	}
+	last, ok := result.(*sa818.LastApplied)
+	if !ok {
+		t.Fatalf("result type = %T, want *sa818.LastApplied", result)
+	}
+	if last == nil || last.TxFreqMHz != "446.1000" || !last.Success {
+		t.Errorf("last applied = %+v, want the settings just programmed", last)
+	}
+}
+
 func TestActionSA818ProgramModuleRejection(t *testing.T) {
 	a := New(filepath.Join(t.TempDir(), "settings.json"), "", nil, "asterisk", nil, nil, nil, "",
 		fakeSA818Tool(t, "Error, invalid information"), filepath.Join(t.TempDir(), "sa818-last.json"), "")

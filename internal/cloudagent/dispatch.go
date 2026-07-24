@@ -51,6 +51,7 @@ func (a *Agent) actions() map[string]actionFunc {
 		"wxTone.save":   a.actionWXToneSave,
 		"wxTone.delete": a.actionWXToneDelete,
 
+		"sa818.last":    a.actionSA818Last,
 		"sa818.program": a.actionSA818Program,
 
 		"iax.loadRegistration": a.actionIAXLoadRegistration,

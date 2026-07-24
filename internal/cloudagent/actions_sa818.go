@@ -20,6 +20,29 @@ type sa818ProgramResult struct {
 	Output string `json:"output"`
 }
 
+// actionSA818Last wraps sa818.LoadLast -- the closest thing to a "read"
+// this feature can offer (see that function's own doc comment). A
+// missing state file isn't an error, it just means nothing has been
+// sent from this device yet, so the result is nil rather than an
+// error in that case -- callers should treat a nil result as "no
+// record yet", not "read failed".
+func (a *Agent) actionSA818Last(_ context.Context, _ json.RawMessage) (any, error) {
+	if a.sa818StatePath == "" {
+		return nil, nil
+	}
+	last, err := sa818.LoadLast(a.sa818StatePath)
+	if err != nil {
+		return nil, err
+	}
+	if last == nil {
+		// A typed nil *LastApplied boxed into `any` would be a
+		// non-nil interface -- return an untyped nil explicitly so
+		// callers checking result == nil get what they expect.
+		return nil, nil
+	}
+	return last, nil
+}
+
 // actionSA818Program wraps sa818.Program, params decoded directly as
 // sa818.Settings, and records the attempt via sa818.SaveLast the same
 // way the local System page's own handler does — so "last sent"

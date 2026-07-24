@@ -53,6 +53,7 @@ func TestActionsRegistryIsFixedAllowlist(t *testing.T) {
 		"wxTone.save":   true,
 		"wxTone.delete": true,
 
+		"sa818.last":    true,
 		"sa818.program": true,
 
 		"iax.loadRegistration": true,
